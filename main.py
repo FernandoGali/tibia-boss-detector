@@ -31,7 +31,7 @@ def consultar_api(mundo):
         print("Falha de conexão com a API.")
 
     # FUNÇÃO : ENCONTRAR CRIATURAS #
-def buscar_criaturas(dados, criaturas_raras):
+def buscar_criaturas(dados, criaturas_raras, data_atividade):
 
     criaturas_econtradas = []
     
@@ -39,31 +39,74 @@ def buscar_criaturas(dados, criaturas_raras):
 
         if criatura["race"] in criaturas_raras:
 
-            criaturas_econtradas.append(criatura)
+            registro = {
+                "data": data_atividade,
+                "criatura": criatura["race"],
+                "kills": criatura["last_day_killed"]
+            }
+
+            criaturas_econtradas.append(registro)
 
     return criaturas_econtradas
 
     # FUNÇÃO : EXIBIR CRIATURAS #
 def exibir_criaturas(criaturas_encontradas):
-
     if criaturas_encontradas:
         for criatura in criaturas_encontradas:
             print("-----------------------------------")
-            print("Criatura:", criatura["race"])
-            print("Mortes no último dia:", criatura["last_day_killed"])
-            print("Mortes na última semana:", criatura["last_week_killed"])
+            print("Data:", criatura["data"])
+            print("Criatura:", criatura["criatura"])
+            print("Mortes nas últimas 24h:", criatura["kills_24h"])
+            print("Mortes nos últimos 7 dias:", criatura["kills_7d"])
             print("-----------------------------------")
-
     else:
         print("Nenhuma criatura rara encontrada nesse servidor.")
 
 
     # ESTRUTURA #
+
+from datetime import date, timedelta
+
+hoje = date.today()
+ontem = hoje - timedelta(days=1)
+print("Hoje é: ", hoje)
+print("d-1 é: ", ontem)
+
 mundo = input("Selecione o Mundo: ")
 
 dados = consultar_api(mundo)
 
-if dados is not None:
-    criaturas_encontradas = buscar_criaturas(dados, criaturas_raras)
+registros = []
 
-    exibir_criaturas(criaturas_encontradas)
+for nome in criaturas_raras:
+    encontrada = False
+
+    for criatura in dados["killstatistics"]["entries"]:
+
+        if criatura["race"] == nome:
+            encontrada = True
+
+            registro = {
+                "data": ontem,
+                "criatura": criatura["race"],
+                "kills_24h": criatura["last_day_killed"],
+                "kills_7d": criatura["last_week_killed"],
+                "encontrada_na_api": True
+            }
+
+            registros.append(registro)
+
+
+    if encontrada == False:
+        registro = {
+            "data": ontem,
+            "criatura": nome,
+            "kills_24h": 0,
+            "kills_7d": 0,
+            "encontrada_na_api": False
+        }
+
+        registros.append(registro)
+
+
+exibir_criaturas(registros)
