@@ -1,8 +1,11 @@
+import requests 
+import json
+from datetime import date,timedelta
+
+
 print("=======================")
 print(" Tibia - Boss Detector")
 print("=======================")
-
-import requests 
 
 criaturas_raras = [
     "Yeti", "Crustacea Gigantica", "Dire Penguin", "Man In The Cave", "Massacre", "Mr. Punish", "Rotworm Queen", "Smuggler Baron Silvertoe",
@@ -76,6 +79,9 @@ mundo = input("Selecione o Mundo: ")
 
 dados = consultar_api(mundo)
 
+with open("historico.json", "r", encoding="utf-8") as arquivo:
+    historico = json.load(arquivo)
+
 registros = []
 
 for nome in criaturas_raras:
@@ -88,6 +94,8 @@ for nome in criaturas_raras:
 
             registro = {
                 "data": ontem,
+                "data_coleta": hoje,
+                "mundo": mundo,
                 "criatura": criatura["race"],
                 "kills_24h": criatura["last_day_killed"],
                 "kills_7d": criatura["last_week_killed"],
@@ -100,6 +108,8 @@ for nome in criaturas_raras:
     if encontrada == False:
         registro = {
             "data": ontem,
+            "data_coleta":hoje,
+            "mundo": mundo,
             "criatura": nome,
             "kills_24h": 0,
             "kills_7d": 0,
@@ -108,5 +118,32 @@ for nome in criaturas_raras:
 
         registros.append(registro)
 
+snapshot_existe = False
+
+for snapshot in historico:
+    if snapshot:
+        primeiro_registro = snapshot[0]
+
+        if (
+            primeiro_registro.get("mundo") == mundo.lower()
+            and primeiro_registro.get("data_coleta") == str(hoje)
+        ):
+            snapshot_existe = True
+            break
+
+if snapshot_existe:
+    print("Snapshot desse mundo já existe para hoje.")
+else:
+    historico.append(registros)
+
+    with open("historico.json", "w", encoding="utf-8") as arquivo:
+        json.dump(historico, arquivo, ensure_ascii=False, indent=4, default=str)
+
+    print("Novo snapshot salvo com sucesso.")
+
+with open("historico.json", "w", encoding="utf-8") as arquivo:
+    json.dump(historico, arquivo, ensure_ascii=False, indent=4, default=str)
+
 
 exibir_criaturas(registros)
+print("Snapshots no histórico:", len(historico))
