@@ -2,11 +2,6 @@ import requests
 import json
 from datetime import date,timedelta
 
-
-print("=======================")
-print(" Tibia - Boss Detector")
-print("=======================")
-
 criaturas_raras = [
     "Yeti", "Crustacea Gigantica", "Dire Penguin", "Man In The Cave", "Massacre", "Mr. Punish", "Rotworm Queen", "Smuggler Baron Silvertoe",
     "The Imperor", "The Pale Count", "The Plasmother", "The Welter", "Tyrn", "White Pale", "Yakchal", "Zulazza the Corruptor", "Apprentice Sheng",
@@ -53,7 +48,9 @@ def buscar_criaturas(dados, criaturas_raras, data_atividade):
     return criaturas_econtradas
 
     # FUNÇÃO : EXIBIR CRIATURAS #
+
 def exibir_criaturas(criaturas_encontradas):
+
     if criaturas_encontradas:
         for criatura in criaturas_encontradas:
             print("-----------------------------------")
@@ -66,84 +63,107 @@ def exibir_criaturas(criaturas_encontradas):
         print("Nenhuma criatura rara encontrada nesse servidor.")
 
 
-    # ESTRUTURA #
+def criar_registros(dados, criaturas_raras, data_atividade, data_coleta, mundo):
+    registros = []
 
-from datetime import date, timedelta
+    for nome in criaturas_raras:
+        encontrada = False
 
-hoje = date.today()
-ontem = hoje - timedelta(days=1)
-print("Hoje é: ", hoje)
-print("d-1 é: ", ontem)
+        for criatura in dados["killstatistics"]["entries"]:
 
-mundo = input("Selecione o Mundo: ")
+            if criatura["race"] == nome:
+                encontrada = True
 
-dados = consultar_api(mundo)
+                registro = {
+                    "data": data_atividade,
+                    "data_coleta": data_coleta,
+                    "mundo": mundo,
+                    "criatura": criatura["race"],
+                    "kills_24h": criatura["last_day_killed"],
+                    "kills_7d": criatura["last_week_killed"],
+                    "encontrada_na_api": True
+                }
 
-with open("historico.json", "r", encoding="utf-8") as arquivo:
-    historico = json.load(arquivo)
+                registros.append(registro)
 
-registros = []
 
-for nome in criaturas_raras:
-    encontrada = False
-
-    for criatura in dados["killstatistics"]["entries"]:
-
-        if criatura["race"] == nome:
-            encontrada = True
-
+        if encontrada == False:
             registro = {
-                "data": ontem,
-                "data_coleta": hoje,
+                "data": data_atividade,
+                "data_coleta":data_coleta,
                 "mundo": mundo,
-                "criatura": criatura["race"],
-                "kills_24h": criatura["last_day_killed"],
-                "kills_7d": criatura["last_week_killed"],
-                "encontrada_na_api": True
+                "criatura": nome,
+                "kills_24h": 0,
+                "kills_7d": 0,
+                "encontrada_na_api": False
             }
 
             registros.append(registro)
 
+    return registros
+    
 
-    if encontrada == False:
-        registro = {
-            "data": ontem,
-            "data_coleta":hoje,
-            "mundo": mundo,
-            "criatura": nome,
-            "kills_24h": 0,
-            "kills_7d": 0,
-            "encontrada_na_api": False
-        }
+    # ESTRUTURA #
 
-        registros.append(registro)
+def main():
 
-snapshot_existe = False
+    print("=======================")
+    print(" Tibia - Boss Detector")
+    print("=======================")
 
-for snapshot in historico:
-    if snapshot:
-        primeiro_registro = snapshot[0]
-
-        if (
-            primeiro_registro.get("mundo") == mundo.lower()
-            and primeiro_registro.get("data_coleta") == str(hoje)
-        ):
-            snapshot_existe = True
-            break
-
-if snapshot_existe:
-    print("Snapshot desse mundo já existe para hoje.")
-else:
-    historico.append(registros)
-
-    with open("historico.json", "w", encoding="utf-8") as arquivo:
-        json.dump(historico, arquivo, ensure_ascii=False, indent=4, default=str)
-
-    print("Novo snapshot salvo com sucesso.")
-
-with open("historico.json", "w", encoding="utf-8") as arquivo:
-    json.dump(historico, arquivo, ensure_ascii=False, indent=4, default=str)
+    hoje = date.today()
 
 
-exibir_criaturas(registros)
-print("Snapshots no histórico:", len(historico))
+    ontem = hoje - timedelta(days=1)
+    print("Hoje é: ", hoje)
+    print("d-1 é: ", ontem)
+
+    mundo = input("Selecione o Mundo: ")
+
+    dados = consultar_api(mundo)
+
+    registros = criar_registros(dados,criaturas_raras,ontem, hoje,mundo)
+
+
+    try:
+        with open("historico.json", "r", encoding="utf-8") as arquivo:
+            historico = json.load(arquivo)
+
+    except FileNotFoundError:
+        historico = []
+
+    except json.JSONDecodeError:
+        historico = []
+
+    if not isinstance(historico, list):
+        historico = []
+
+    snapshot_existe = False
+
+    for snapshot in historico:
+        if snapshot:
+            primeiro_registro = snapshot[0]
+
+            if (
+                primeiro_registro.get("mundo") == mundo.lower()
+                and primeiro_registro.get("data_coleta") == str(hoje)
+            ):
+                snapshot_existe = True
+                break
+
+    if snapshot_existe:
+        print("Snapshot desse mundo já existe para hoje.")
+    else:
+        historico.append(registros)
+
+        with open("historico.json", "w", encoding="utf-8") as arquivo:
+            json.dump(historico, arquivo, ensure_ascii=False, indent=4, default=str)
+
+        print("Novo snapshot salvo com sucesso.")
+
+
+    exibir_criaturas(registros)
+    print("Snapshots no histórico:", len(historico))
+
+if __name__ == "__main__":
+    main()
