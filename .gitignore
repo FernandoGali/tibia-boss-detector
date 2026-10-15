@@ -1,0 +1,22 @@
+
+# Ambientes virtuais #
+.venv/
+venv/
+
+# Cache do Python #
+__pycache__/
+*.py[cod]
+
+# Cache dos testes #
+.pytest_cache/
+
+# Configurações locais do VS Code #
+.vscode/
+
+# Arquivos de ambiente e credenciais #
+.env
+.env.*
+
+# Histórico gerado pelo projeto #
+historico.json
+historico_teste.json
