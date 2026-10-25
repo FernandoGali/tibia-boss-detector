@@ -1,7 +1,8 @@
-import requests 
-import json
+import requests
 from datetime import datetime,timedelta
 from zoneinfo import ZoneInfo
+
+from banco import salvar_registros
 
     # FUSO HORÁRIO DO TIBIA #
     # O server save e a atualização das kill statistics seguem o horário de Berlim #
@@ -31,6 +32,24 @@ def consultar_api(mundo):
         return None
 
     return resposta.json()
+
+    # FUNÇÃO : CONSULTAR MUNDOS #
+    # Busca a lista de mundos normais (sem os de torneio) #
+def consultar_mundos():
+
+    url = "https://api.tibiadata.com/v4/worlds"
+
+    try:
+        resposta = requests.get(url, timeout=10)
+    except requests.exceptions.RequestException:
+        print("Falha de conexão com a API.")
+        return None
+
+    if resposta.status_code != 200:
+        print("Erro ao consultar API:", resposta.status_code)
+        return None
+
+    return resposta.json()["worlds"]["regular_worlds"]
 
     # FUNÇÃO : DATA DE HOJE NO TIBIA #
     # Usa o horário de Berlim e não o do computador #
@@ -124,46 +143,15 @@ def main():
 
     registros = criar_registros(dados,criaturas_raras,ontem, hoje,mundo)
 
+    # O banco recusa sozinho o mesmo mundo, criatura e dia (regra UNIQUE) #
+    novos = salvar_registros(registros)
 
-    try:
-        with open("historico.json", "r", encoding="utf-8") as arquivo:
-            historico = json.load(arquivo)
-
-    except FileNotFoundError:
-        historico = []
-
-    except json.JSONDecodeError:
-        historico = []
-
-    if not isinstance(historico, list):
-        historico = []
-
-    snapshot_existe = False
-
-    for snapshot in historico:
-        if snapshot:
-            primeiro_registro = snapshot[0]
-
-            if (
-                primeiro_registro.get("mundo") == mundo
-                and primeiro_registro.get("data_coleta") == str(hoje)
-            ):
-                snapshot_existe = True
-                break
-
-    if snapshot_existe:
-        print("Snapshot desse mundo já existe para hoje.")
+    if novos == 0:
+        print("Snapshot desse mundo já existe para esse dia.")
     else:
-        historico.append(registros)
-
-        with open("historico.json", "w", encoding="utf-8") as arquivo:
-            json.dump(historico, arquivo, ensure_ascii=False, indent=4, default=str)
-
-        print("Novo snapshot salvo com sucesso.")
-
+        print("Novo snapshot salvo com sucesso:", novos, "registros.")
 
     exibir_criaturas(registros)
-    print("Snapshots no histórico:", len(historico))
 
 if __name__ == "__main__":
     main()

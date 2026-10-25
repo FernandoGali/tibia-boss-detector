@@ -7,16 +7,38 @@ venv/
 __pycache__/
 *.py[cod]
 
-# Cache dos testes #
+# Cache e relatórios dos testes #
 .pytest_cache/
+.coverage
+htmlcov/
 
-# Configurações locais do VS Code #
+# Configurações locais dos editores #
 .vscode/
+.idea/
+
+# Arquivos do sistema operacional #
+Thumbs.db
+desktop.ini
+.DS_Store
 
 # Arquivos de ambiente e credenciais #
 .env
 .env.*
+!.env.example
 
-# Histórico gerado pelo projeto #
+# Histórico gerado pelo coletor #
 historico.json
 historico_teste.json
+
+# Arquivos gerados pelo sentinela #
+sentinelas.json
+sentinela_log.json
+sentinela_saida.txt
+
+# Bancos de dados locais #
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs #
+*.log
