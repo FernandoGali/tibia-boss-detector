@@ -4,27 +4,33 @@ Ferramenta para ajudar jogadores de Tibia a encontrar **criaturas raras e bosses
 
 O projeto consulta as kill statistics de cada mundo pela [API TibiaData](https://tibiadata.com/) e guarda um histórico diário. Se uma criatura rara aparece com mortes num mundo, é porque ela nasceu lá. Juntando esse histórico, dá para mostrar onde e com que frequência cada uma aparece.
 
-> **Situação atual:** fase de coleta de dados, rodando pelo terminal. O objetivo final é um site onde o usuário escolhe o mundo numa lista e vê o histórico das criaturas raras.
+> **Situação atual:** coleta automática de todos os mundos funcionando, gravando no PostgreSQL. O objetivo final é um site onde o usuário escolhe o mundo numa lista e vê o histórico das criaturas raras.
 
 ## Como funciona
 
-O projeto tem duas partes:
+De hora em hora, o `main.py` roda duas etapas:
 
-| Parte | Arquivo | O que faz |
-|---|---|---|
-| Coletor | [main.py](main.py) | Consulta as kill statistics de um mundo e salva um snapshot por mundo e por dia no PostgreSQL |
-| Banco | [banco.py](banco.py) | Conexão com o PostgreSQL, criação das tabelas e gravação dos snapshots |
-| Sentinela | [sentinela.py](sentinela.py) | De hora em hora, consulta alguns mundos de cada região para descobrir **quando** as kill statistics foram atualizadas |
+1. **Sentinela:** consulta alguns mundos de cada região para descobrir **quando** as kill statistics foram atualizadas.
+2. **Coletor:** para cada região, coleta as criaturas raras de todos os mundos que ainda não têm o dia da última atualização.
+
+| Arquivo | O que faz |
+|---|---|
+| [main.py](main.py) | Roda tudo na ordem (sentinela e depois coletor) e grava o log |
+| [sentinela.py](sentinela.py) | Escolhe as sentinelas e detecta quando as kill statistics mudaram |
+| [coletor.py](coletor.py) | Lista das criaturas raras, coleta dos mundos pendentes |
+| [tibia.py](tibia.py) | Consultas à API TibiaData, horários do Tibia e cálculo da data da atividade |
+| [banco.py](banco.py) | Conexão com o PostgreSQL, tabelas e todas as gravações e consultas |
 
 ### Horários do Tibia
 
 - O **server save** acontece todo dia às 10:00 no horário de Berlim, igual para todos os mundos.
-- As **kill statistics** são atualizadas cerca de 7 horas antes, por volta das 03:00 de Berlim (23:00 de Brasília no inverno europeu).
-- Por isso todas as datas do projeto usam o fuso `Europe/Berlin`, e não o horário do computador.
+- As **kill statistics** são atualizadas de madrugada em Berlim. Na primeira noite medida (26/10/2026), a atualização aconteceu **entre 03:04 e 04:05 de Berlim**, para **todas as regiões ao mesmo tempo**.
+- A atualização da madrugada do dia D traz as mortes do **dia D-1**. Essa é a `data_atividade` gravada.
+- Todas as datas do projeto usam o fuso `Europe/Berlin`, e não o horário do computador.
 
 ### Sentinela
 
-O sentinela escolhe os mundos mais cheios de cada região:
+O sentinela usa os mundos mais cheios de cada região:
 
 | Região | Sentinelas |
 |---|---|
@@ -35,7 +41,14 @@ O sentinela escolhe os mundos mais cheios de cada região:
 
 A cada execução, ele soma as kills de 24h e de 7 dias de cada sentinela e compara com a leitura anterior. Se a soma mudou, as kill statistics daquela região foram atualizadas.
 
-As sentinelas ficam fixas em `sentinelas.json` e só são escolhidas de novo se algum mundo deixar de existir.
+As sentinelas ficam fixas na tabela `sentinelas` e só são escolhidas de novo se algum mundo deixar de existir.
+
+### Coletor
+
+- A data da atividade vem do **horário em que o sentinela detectou a atualização**, e não de um horário fixo. Se a atualização atrasar, a coleta se adapta sozinha.
+- Uma atualização detectada antes das 02:00 de Berlim (por exemplo, com o computador desligado de madrugada) ainda conta como a do dia anterior (`hora_virada` no [tibia.py](tibia.py)).
+- **Proteção por mundo:** se o resumo de kills de um mundo for igual ao da coleta anterior, ele ainda não atualizou. O coletor não grava e tenta de novo na próxima hora.
+- Um mundo que falhar (API fora do ar, por exemplo) também é tentado de novo na próxima hora.
 
 ## Instalação
 
@@ -83,42 +96,44 @@ Pode rodar quantas vezes quiser: só cria o que ainda não existe.
 
 | Tabela | Conteúdo |
 |---|---|
-| `snapshots` | Uma linha por mundo, criatura e dia. A regra `UNIQUE (mundo, criatura, data_atividade)` faz o banco recusar o mesmo dia duas vezes |
+| `snapshots` | Uma linha por mundo, criatura rara e dia. `UNIQUE (mundo, criatura, data_atividade)` faz o banco recusar o mesmo dia duas vezes |
+| `coletas` | Uma linha por mundo e dia, com o resumo de kills do mundo inteiro. Serve para saber o que já foi coletado e para a proteção por mundo |
 | `sentinelas` | Mundos escolhidos como sentinela |
-| `leituras_sentinela` | Leituras de hora em hora do sentinela |
+| `leituras_sentinela` | Todas as leituras de hora em hora do sentinela |
 
-> O sentinela ainda grava em JSON. As tabelas `sentinelas` e `leituras_sentinela` já existem e vão ser usadas quando o experimento de horário terminar.
+Exemplo de consulta: quais criaturas raras morreram num dia, e onde:
+
+```sql
+SELECT criatura, mundo, kills_24h
+FROM snapshots
+WHERE data_atividade = '2026-10-25' AND kills_24h > 0
+ORDER BY criatura, mundo;
+```
 
 ## Como usar
 
-**Coletor (um mundo):**
+**Uma execução (sentinela + coletor):**
 
 ```bash
 python main.py
 ```
 
-Digite o nome do mundo no formato oficial, por exemplo `Antica`.
+O que acontece em cada execução fica em `boss_detector.log`, com data e hora em cada linha.
 
-**Sentinela (uma leitura):**
-
-```bash
-python sentinela.py
-```
-
-**Sentinela de hora em hora no Windows:** o sentinela grava cada execução em `sentinela_saida.txt`, com data e hora em cada linha. Para agendar no Agendador de Tarefas, rode no **PowerShell**, ajustando os dois caminhos:
+**De hora em hora no Windows:** rode no **PowerShell**, ajustando os dois caminhos:
 
 ```powershell
 $projeto = "C:\caminho\do\projeto"
 $pythonw = "C:\caminho\do\Python\pythonw.exe"
 
-$acao     = New-ScheduledTaskAction -Execute $pythonw -Argument "sentinela.py" -WorkingDirectory $projeto
+$acao     = New-ScheduledTaskAction -Execute $pythonw -Argument "main.py" -WorkingDirectory $projeto
 $gatilho  = New-ScheduledTaskTrigger -Once -At "00:05" -RepetitionInterval (New-TimeSpan -Hours 1)
 $opcoes   = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 
 Register-ScheduledTask -TaskName "Tibia Sentinela" -Action $acao -Trigger $gatilho -Settings $opcoes
 ```
 
-- O `pythonw.exe` fica na mesma pasta do `python.exe` (`python -c "import sys; print(sys.executable)"` mostra onde está). Ele roda o Python **sem abrir janela**: com o `python.exe`, fechar a janela ou apertar `Ctrl + C` interrompe o sentinela e a leitura se perde.
+- O `pythonw.exe` fica na mesma pasta do `python.exe` (`python -c "import sys; print(sys.executable)"` mostra onde está). Ele roda o Python **sem abrir janela**: com o `python.exe`, fechar a janela ou apertar `Ctrl + C` interrompe a execução no meio.
 - `StartWhenAvailable` roda assim que possível se o computador estava desligado no horário.
 - Para remover: `Unregister-ScheduledTask -TaskName "Tibia Sentinela" -Confirm:$false`.
 
@@ -128,24 +143,14 @@ Register-ScheduledTask -TaskName "Tibia Sentinela" -Action $acao -Trigger $gatil
 python -m pytest
 ```
 
-Os testes não chamam a API de verdade: as respostas são simuladas com o `monkeypatch` do pytest.
-
-## Arquivos gerados
-
-Ficam fora do git (estão no `.gitignore`):
-
-| Arquivo | Quem gera | Conteúdo |
-|---|---|---|
-| `sentinelas.json` | Sentinela | Mundos escolhidos como sentinela |
-| `sentinela_log.json` | Sentinela | Todas as leituras, com horário de Berlim e de Brasília |
-| `sentinela_saida.txt` | Sentinela | Resumo de cada execução, com data e hora, e os erros, se houver |
+Os testes não chamam a API de verdade (as respostas são simuladas com o `monkeypatch` do pytest) e não precisam do banco.
 
 ## Próximos passos
 
-- [ ] Confirmar pelo log do sentinela o horário real de atualização de cada região
-- [ ] Coletar todos os mundos automaticamente, disparado pelo sentinela
-- [x] Trocar o `historico.json` pelo PostgreSQL no coletor
-- [ ] Passar o sentinela para o PostgreSQL
-- [ ] Definir a data da atividade pelo horário real da atualização (hoje, coletar entre 00:00 e ~03:00 de Berlim grava o dia errado)
+- [x] Confirmar o horário real de atualização das kill statistics (primeira noite: 03:04 a 04:05 de Berlim, todas as regiões juntas)
+- [x] Trocar os arquivos JSON pelo PostgreSQL
+- [x] Coletar todos os mundos automaticamente, disparado pelo sentinela
+- [x] Definir a data da atividade pelo horário real da atualização
+- [ ] Acompanhar mais alguns dias para confirmar o horário da atualização
 - [ ] Rodar em um servidor, sem depender do computador ligado
 - [ ] Criar a API e o site

@@ -1,9 +1,5 @@
-import json
-import logging
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
-from main import consultar_api, consultar_mundos, fuso_tibia
+import banco
+from tibia import calcular_resumo, consultar_api, registrar
 
     # QUANTIDADE DE SENTINELAS POR REGIÃO #
     # A Oceania só tem 3 mundos, então fica com 1 sentinela #
@@ -14,41 +10,7 @@ sentinelas_por_regiao = {
     "Oceania": 1
 }
 
-fuso_brasilia = ZoneInfo("America/Sao_Paulo")
-
-arquivo_sentinelas = "sentinelas.json"
-arquivo_log = "sentinela_log.json"
-arquivo_saida = "sentinela_saida.txt"
-
     # FUNÇÕES #
-
-    # FUNÇÃO : REGISTRAR #
-    # Mostra a mensagem na tela e também grava no sentinela_saida.txt #
-    # Quando roda agendado não tem tela, então o arquivo é o que fica #
-def registrar(mensagem):
-
-    print(mensagem)
-    logging.info(mensagem)
-
-    # FUNÇÃO : LER JSON #
-    # Lê um arquivo JSON. Se não existir ou estiver quebrado, devolve o valor padrão #
-def ler_json(caminho, padrao):
-
-    try:
-        with open(caminho, "r", encoding="utf-8") as arquivo:
-            return json.load(arquivo)
-
-    except FileNotFoundError:
-        return padrao
-
-    except json.JSONDecodeError:
-        return padrao
-
-    # FUNÇÃO : SALVAR JSON #
-def salvar_json(caminho, conteudo):
-
-    with open(caminho, "w", encoding="utf-8") as arquivo:
-        json.dump(conteudo, arquivo, ensure_ascii=False, indent=4)
 
     # FUNÇÃO : ESCOLHER SENTINELAS #
     # Pega os mundos mais cheios de cada região #
@@ -67,16 +29,11 @@ def escolher_sentinelas(mundos, sentinelas_por_regiao):
     return sentinelas
 
     # FUNÇÃO : CARREGAR SENTINELAS #
-    # As sentinelas ficam fixas no arquivo, para comparar sempre os mesmos mundos #
+    # As sentinelas ficam fixas no banco, para comparar sempre os mesmos mundos #
     # Só escolhe de novo se algum mundo salvo deixou de existir #
-def carregar_sentinelas():
+def carregar_sentinelas(mundos):
 
-    sentinelas = ler_json(arquivo_sentinelas, [])
-
-    mundos = consultar_mundos()
-
-    if mundos is None:
-        return sentinelas
+    sentinelas = banco.listar_sentinelas()
 
     nomes_mundos = [m["name"] for m in mundos]
 
@@ -86,34 +43,11 @@ def carregar_sentinelas():
         return sentinelas
 
     sentinelas = escolher_sentinelas(mundos, sentinelas_por_regiao)
-    salvar_json(arquivo_sentinelas, sentinelas)
+    banco.trocar_sentinelas(sentinelas)
 
     registrar("Novas sentinelas escolhidas: " + ", ".join(s["mundo"] for s in sentinelas))
 
     return sentinelas
-
-    # FUNÇÃO : CALCULAR RESUMO #
-    # Soma as kills de todas as criaturas do mundo #
-    # Se a soma mudar, as kill statistics foram atualizadas #
-def calcular_resumo(dados):
-
-    entradas = dados["killstatistics"]["entries"]
-
-    resumo = {
-        "kills_24h_total": sum(c["last_day_killed"] for c in entradas),
-        "kills_7d_total": sum(c["last_week_killed"] for c in entradas)
-    }
-
-    return resumo
-
-    # FUNÇÃO : ÚLTIMA LEITURA DO MUNDO #
-def ultima_leitura(log, mundo):
-
-    for leitura in reversed(log):
-        if leitura["mundo"] == mundo:
-            return leitura
-
-    return None
 
     # FUNÇÃO : VERIFICAR MUDANÇA #
     # None = primeira leitura desse mundo, sem nada para comparar #
@@ -127,27 +61,11 @@ def verificar_mudanca(anterior, resumo):
         or anterior["kills_7d_total"] != resumo["kills_7d_total"]
     )
 
+    # FUNÇÃO : VERIFICAR SENTINELAS #
+    # Consulta cada sentinela, compara com a leitura anterior e grava no banco #
+def verificar_sentinelas(mundos, agora):
 
-    # ESTRUTURA #
-
-def main():
-
-    print("=======================")
-    print(" Tibia - Sentinela")
-    print("=======================")
-
-    agora = datetime.now(fuso_tibia)
-
-    registrar("----- Berlim " + agora.strftime("%Y-%m-%d %H:%M")
-              + " | Brasília " + agora.astimezone(fuso_brasilia).strftime("%Y-%m-%d %H:%M") + " -----")
-
-    sentinelas = carregar_sentinelas()
-
-    if not sentinelas:
-        registrar("Não foi possível definir as sentinelas.")
-        return
-
-    log = ler_json(arquivo_log, [])
+    sentinelas = carregar_sentinelas(mundos)
 
     for sentinela in sentinelas:
 
@@ -160,20 +78,17 @@ def main():
             continue
 
         resumo = calcular_resumo(dados)
-        mudou = verificar_mudanca(ultima_leitura(log, mundo), resumo)
+        mudou = verificar_mudanca(banco.ultima_leitura(mundo), resumo)
 
-        leitura = {
+        banco.salvar_leitura({
             "mundo": mundo,
             "regiao": sentinela["regiao"],
-            "horario_berlim": agora.isoformat(timespec="minutes"),
-            "horario_brasilia": agora.astimezone(fuso_brasilia).isoformat(timespec="minutes"),
+            "horario": agora,
             "timestamp_api": dados.get("information", {}).get("timestamp"),
             "kills_24h_total": resumo["kills_24h_total"],
             "kills_7d_total": resumo["kills_7d_total"],
             "mudou": mudou
-        }
-
-        log.append(leitura)
+        })
 
         if mudou is None:
             situacao = "primeira leitura"
@@ -182,24 +97,4 @@ def main():
         else:
             situacao = "sem mudança"
 
-        registrar(f"{mundo} ({sentinela['regiao']}) - {situacao}")
-
-    salvar_json(arquivo_log, log)
-
-if __name__ == "__main__":
-
-    # Grava as mensagens no arquivo com data e hora em cada linha #
-    logging.basicConfig(
-        filename=arquivo_saida,
-        encoding="utf-8",
-        level=logging.INFO,
-        format="%(asctime)s  %(message)s",
-        datefmt="%Y-%m-%d %H:%M"
-    )
-
-    # Se der qualquer erro, ele fica registrado no arquivo em vez de sumir #
-    try:
-        main()
-    except Exception:
-        logging.exception("Erro ao rodar o sentinela")
-        raise
+        registrar(f"Sentinela {mundo} ({sentinela['regiao']}) - {situacao}")
