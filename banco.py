@@ -49,7 +49,7 @@ def conectar():
     url = os.getenv("DATABASE_URL")
 
     if not url:
-        raise RuntimeError("DATABASE_URL não encontrado. Crie o arquivo .env (veja o .env.example).")
+        raise RuntimeError("DATABASE_URL não encontrado. Crie o arquivo .env (veja o README).")
 
     return psycopg.connect(url)
 

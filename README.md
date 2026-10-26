@@ -65,7 +65,7 @@ CREATE DATABASE boss_detector OWNER boss_detector;
 
 Use uma senha só com letras e números: ela vai dentro de um endereço no `.env`, e símbolos como `@`, `:` e `/` confundem a conexão.
 
-**2. Criar o arquivo `.env`.** Copie o [.env.example](.env.example) para `.env` e coloque a sua senha:
+**2. Criar o arquivo `.env`.** Na pasta do projeto, crie um arquivo chamado `.env` com esta linha, trocando `sua_senha` pela senha do passo 1:
 
 ```
 DATABASE_URL=postgresql://boss_detector:sua_senha@localhost:5432/boss_detector
