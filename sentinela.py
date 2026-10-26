@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -17,8 +18,17 @@ fuso_brasilia = ZoneInfo("America/Sao_Paulo")
 
 arquivo_sentinelas = "sentinelas.json"
 arquivo_log = "sentinela_log.json"
+arquivo_saida = "sentinela_saida.txt"
 
     # FUNÇÕES #
+
+    # FUNÇÃO : REGISTRAR #
+    # Mostra a mensagem na tela e também grava no sentinela_saida.txt #
+    # Quando roda agendado não tem tela, então o arquivo é o que fica #
+def registrar(mensagem):
+
+    print(mensagem)
+    logging.info(mensagem)
 
     # FUNÇÃO : LER JSON #
     # Lê um arquivo JSON. Se não existir ou estiver quebrado, devolve o valor padrão #
@@ -78,7 +88,7 @@ def carregar_sentinelas():
     sentinelas = escolher_sentinelas(mundos, sentinelas_por_regiao)
     salvar_json(arquivo_sentinelas, sentinelas)
 
-    print("Novas sentinelas escolhidas:", ", ".join(s["mundo"] for s in sentinelas))
+    registrar("Novas sentinelas escolhidas: " + ", ".join(s["mundo"] for s in sentinelas))
 
     return sentinelas
 
@@ -128,13 +138,13 @@ def main():
 
     agora = datetime.now(fuso_tibia)
 
-    print("Horário de Berlim:  ", agora.strftime("%Y-%m-%d %H:%M"))
-    print("Horário de Brasília:", agora.astimezone(fuso_brasilia).strftime("%Y-%m-%d %H:%M"))
+    registrar("----- Berlim " + agora.strftime("%Y-%m-%d %H:%M")
+              + " | Brasília " + agora.astimezone(fuso_brasilia).strftime("%Y-%m-%d %H:%M") + " -----")
 
     sentinelas = carregar_sentinelas()
 
     if not sentinelas:
-        print("Não foi possível definir as sentinelas.")
+        registrar("Não foi possível definir as sentinelas.")
         return
 
     log = ler_json(arquivo_log, [])
@@ -146,7 +156,7 @@ def main():
         dados = consultar_api(mundo)
 
         if dados is None:
-            print(mundo, "- não foi possível consultar")
+            registrar(mundo + " - não foi possível consultar")
             continue
 
         resumo = calcular_resumo(dados)
@@ -172,9 +182,24 @@ def main():
         else:
             situacao = "sem mudança"
 
-        print(f"{mundo} ({sentinela['regiao']}) - {situacao}")
+        registrar(f"{mundo} ({sentinela['regiao']}) - {situacao}")
 
     salvar_json(arquivo_log, log)
 
 if __name__ == "__main__":
-    main()
+
+    # Grava as mensagens no arquivo com data e hora em cada linha #
+    logging.basicConfig(
+        filename=arquivo_saida,
+        encoding="utf-8",
+        level=logging.INFO,
+        format="%(asctime)s  %(message)s",
+        datefmt="%Y-%m-%d %H:%M"
+    )
+
+    # Se der qualquer erro, ele fica registrado no arquivo em vez de sumir #
+    try:
+        main()
+    except Exception:
+        logging.exception("Erro ao rodar o sentinela")
+        raise

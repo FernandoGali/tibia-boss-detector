@@ -105,15 +105,22 @@ Digite o nome do mundo no formato oficial, por exemplo `Antica`.
 python sentinela.py
 ```
 
-**Sentinela de hora em hora no Windows:** o arquivo [rodar_sentinela.bat](rodar_sentinela.bat) roda o sentinela e guarda a saída em `sentinela_saida.txt`. Para agendar no Agendador de Tarefas:
+**Sentinela de hora em hora no Windows:** o sentinela grava cada execução em `sentinela_saida.txt`, com data e hora em cada linha. Para agendar no Agendador de Tarefas, rode no **PowerShell**, ajustando os dois caminhos:
 
-```bash
-schtasks /Create /TN "Tibia Sentinela" /SC HOURLY /ST 00:05 /TR "C:\caminho\do\projeto\rodar_sentinela.bat"
+```powershell
+$projeto = "C:\caminho\do\projeto"
+$pythonw = "C:\caminho\do\Python\pythonw.exe"
+
+$acao     = New-ScheduledTaskAction -Execute $pythonw -Argument "sentinela.py" -WorkingDirectory $projeto
+$gatilho  = New-ScheduledTaskTrigger -Once -At "00:05" -RepetitionInterval (New-TimeSpan -Hours 1)
+$opcoes   = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+
+Register-ScheduledTask -TaskName "Tibia Sentinela" -Action $acao -Trigger $gatilho -Settings $opcoes
 ```
 
-Para remover: `schtasks /Delete /TN "Tibia Sentinela" /F`.
-
-> O `.bat` usa o caminho do Python da máquina de desenvolvimento. Ajuste para o seu caminho (`python -c "import sys; print(sys.executable)"` mostra onde está).
+- O `pythonw.exe` fica na mesma pasta do `python.exe` (`python -c "import sys; print(sys.executable)"` mostra onde está). Ele roda o Python **sem abrir janela**: com o `python.exe`, fechar a janela ou apertar `Ctrl + C` interrompe o sentinela e a leitura se perde.
+- `StartWhenAvailable` roda assim que possível se o computador estava desligado no horário.
+- Para remover: `Unregister-ScheduledTask -TaskName "Tibia Sentinela" -Confirm:$false`.
 
 ## Testes
 
@@ -131,7 +138,7 @@ Ficam fora do git (estão no `.gitignore`):
 |---|---|---|
 | `sentinelas.json` | Sentinela | Mundos escolhidos como sentinela |
 | `sentinela_log.json` | Sentinela | Todas as leituras, com horário de Berlim e de Brasília |
-| `sentinela_saida.txt` | `rodar_sentinela.bat` | O que o sentinela imprimiu em cada execução |
+| `sentinela_saida.txt` | Sentinela | Resumo de cada execução, com data e hora, e os erros, se houver |
 
 ## Próximos passos
 
