@@ -1,12 +1,10 @@
 import logging
 
 from coletor import coletar_pendentes
+from registro import configurar_log, registrar
 from sentinela import verificar_sentinelas
-from tibia import agora_tibia, consultar_mundos, fuso_brasilia, registrar
-
-    # ARQUIVO DE LOG #
-    # Tudo o que acontece em cada execução fica registrado aqui, com data e hora #
-arquivo_log = "boss_detector.log"
+from tempo import agora_tibia, fuso_brasilia
+from tibia import consultar_mundos
 
 
     # ESTRUTURA #
@@ -30,14 +28,7 @@ def main():
 
 if __name__ == "__main__":
 
-    # Grava as mensagens no arquivo com data e hora em cada linha #
-    logging.basicConfig(
-        filename=arquivo_log,
-        encoding="utf-8",
-        level=logging.INFO,
-        format="%(asctime)s  %(message)s",
-        datefmt="%Y-%m-%d %H:%M"
-    )
+    configurar_log()
 
     # Se der qualquer erro, ele fica registrado no arquivo em vez de sumir #
     try:

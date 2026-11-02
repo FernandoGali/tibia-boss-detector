@@ -27,9 +27,13 @@ Se algum mundo falhar ou ainda estiver com os números do dia anterior, ele é c
 
 - `main.py` - roda tudo (sentinela e depois coletor)
 - `sentinela.py` - descobre quando as kill statistics atualizaram
-- `coletor.py` - lista das criaturas raras e coleta dos mundos
-- `tibia.py` - consultas à API e horários do Tibia
+- `coletor.py` - coleta dos mundos
+- `criaturas.py` - lista das criaturas raras
+- `tibia.py` - consultas à API do TibiaData
+- `tempo.py` - fusos e horários do Tibia
+- `registro.py` - log
 - `banco.py` - tudo que mexe no PostgreSQL
+- `api.py` - API que o site vai usar
 
 ## Instalação
 

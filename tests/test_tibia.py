@@ -2,7 +2,8 @@ from datetime import datetime, date, timezone
 
 import requests
 
-from tibia import calcular_resumo, consultar_api, data_atividade, fuso_tibia
+from tempo import data_atividade, fuso_tibia
+from tibia import calcular_resumo, consultar_api
 
 
     # TESTES #

@@ -3,7 +3,9 @@ from datetime import datetime
 import banco
 import sentinela
 from sentinela import escolher_sentinelas, verificar_mudanca
-from tibia import fuso_tibia
+from tempo import fuso_tibia
+
+from ajudantes import dados_falsos
 
 
     # TESTES #
@@ -46,16 +48,6 @@ mundos = [
     {"name": "Secura", "location": "Europe", "players_online": 600},
     {"name": "Nevia", "location": "Europe", "players_online": 400}
 ]
-
-    # AJUDANTE : DADOS FALSOS DA API #
-def dados_falsos(kills):
-
-    return {
-        "information": {"timestamp": "2026-11-02T03:30:00Z"},
-        "killstatistics": {
-            "entries": [{"race": "Yakchal", "last_day_killed": kills, "last_week_killed": kills}]
-        }
-    }
 
     # AJUDANTE : HORÁRIO EM BERLIM #
 def as_horas(hora):

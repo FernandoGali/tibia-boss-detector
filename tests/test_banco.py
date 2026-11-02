@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 import banco
-from tibia import fuso_tibia
+from tempo import fuso_tibia
 
     # Todos os testes deste arquivo usam o banco de testes (banco_teste) #
 

@@ -2,14 +2,11 @@ import logging
 import time
 
 import banco
+from criaturas import criaturas_raras
+from registro import registrar
 from sentinela import verificar_mudanca
-from tibia import calcular_resumo, consultar_api, data_atividade, registrar
-
-criaturas_raras = [
-    "Yeti", "Crustacea Gigantica", "Dire Penguin", "Man In The Cave", "Massacre", "Mr. Punish", "Rotworm Queen", "Smuggler Baron Silvertoe",
-    "The Imperor", "The Pale Count", "The Plasmother", "The Welter", "Tyrn", "White Pale", "Yakchal", "Zulazza the Corruptor", "Apprentice Sheng",
-    "Munster", "Necropharus", "Dracola", "The Handmaiden", "Zarabustor", "Furyosa", "Draptor", "Arthom the Hunter", "Xenia", "Undead Cavebear",
-    "Battlemaster Zunzu", "Midnight Panther"]
+from tempo import data_atividade
+from tibia import calcular_resumo, consultar_api
 
     # PAUSA ENTRE CONSULTAS #
     # Meio segundo entre um mundo e outro, para não sobrecarregar a API #
@@ -18,47 +15,31 @@ pausa_entre_consultas = 0.5
     # FUNÇÕES #
 
     # FUNÇÃO : CRIAR REGISTROS #
+    # Um registro para cada criatura rara; a que não veio na API entra com 0 kills #
 def criar_registros(dados, criaturas_raras, data_atividade, data_coleta, mundo):
-    registros = []
 
     # Momento em que a API gerou os dados #
     timestamp_api = dados.get("information", {}).get("timestamp")
 
+    # Dicionário nome -> dados da criatura, para achar cada uma sem percorrer a lista toda #
+    na_api = {criatura["race"]: criatura for criatura in dados["killstatistics"]["entries"]}
+
+    registros = []
+
     for nome in criaturas_raras:
-        encontrada = False
 
-        for criatura in dados["killstatistics"]["entries"]:
+        criatura = na_api.get(nome)
 
-            if criatura["race"] == nome:
-                encontrada = True
-
-                registro = {
-                    "data": data_atividade,
-                    "data_coleta": data_coleta,
-                    "mundo": mundo,
-                    "criatura": criatura["race"],
-                    "kills_24h": criatura["last_day_killed"],
-                    "kills_7d": criatura["last_week_killed"],
-                    "encontrada_na_api": True,
-                    "timestamp_api": timestamp_api
-                }
-
-                registros.append(registro)
-
-
-        if encontrada == False:
-            registro = {
-                "data": data_atividade,
-                "data_coleta":data_coleta,
-                "mundo": mundo,
-                "criatura": nome,
-                "kills_24h": 0,
-                "kills_7d": 0,
-                "encontrada_na_api": False,
-                "timestamp_api": timestamp_api
-            }
-
-            registros.append(registro)
+        registros.append({
+            "data": data_atividade,
+            "data_coleta": data_coleta,
+            "mundo": mundo,
+            "criatura": nome,
+            "kills_24h": criatura["last_day_killed"] if criatura else 0,
+            "kills_7d": criatura["last_week_killed"] if criatura else 0,
+            "encontrada_na_api": criatura is not None,
+            "timestamp_api": timestamp_api
+        })
 
     return registros
 

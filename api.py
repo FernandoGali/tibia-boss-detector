@@ -1,8 +1,8 @@
 from fastapi import FastAPI, HTTPException, Query
 
 import banco
-from coletor import criaturas_raras
-from tibia import agora_tibia
+from criaturas import criaturas_raras
+from tempo import agora_tibia
 
     # API #
     # É por aqui que o site vai buscar os dados #
@@ -50,7 +50,8 @@ def consulta(mundo: str, criaturas: list[str] = Query(default=[])):
         raise HTTPException(status_code=400, detail=f"Criaturas desconhecidas: {', '.join(desconhecidas)}")
 
     if not criaturas:
-        criaturas = criaturas_raras
+        # O banco precisa de uma lista, e criaturas_raras é uma tupla #
+        criaturas = list(criaturas_raras)
 
     # Data de hoje no horário de Berlim, e não a do computador #
     hoje = agora_tibia().date()

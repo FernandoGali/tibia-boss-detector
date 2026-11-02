@@ -3,7 +3,9 @@ from datetime import date, datetime
 import banco
 import coletor
 from coletor import criar_registros, dados_repetidos
-from tibia import fuso_tibia
+from tempo import fuso_tibia
+
+from ajudantes import dados_falsos
 
 
     # TESTES #
@@ -71,16 +73,6 @@ def test_dados_repetidos():
 
     # TESTES : FLUXO DO COLETOR #
     # Usam o banco de testes (banco_teste) e uma API falsa (monkeypatch) #
-
-    # AJUDANTE : DADOS FALSOS DA API #
-def dados_falsos(kills):
-
-    return {
-        "information": {"timestamp": "2026-11-02T03:30:00Z"},
-        "killstatistics": {
-            "entries": [{"race": "Yakchal", "last_day_killed": kills, "last_week_killed": kills}]
-        }
-    }
 
     # AJUDANTE : PREPARAR COLETA #
     # Sentinela da Europa atualizou às 04:05 de 02/11 (Berlim) = dia de atividade 01/11 #

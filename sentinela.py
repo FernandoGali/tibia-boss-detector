@@ -1,5 +1,6 @@
 import banco
-from tibia import calcular_resumo, consultar_api, registrar
+from registro import registrar
+from tibia import calcular_resumo, consultar_api
 
     # QUANTIDADE DE SENTINELAS POR REGIÃO #
     # A Oceania só tem 3 mundos, então fica com 1 sentinela #
