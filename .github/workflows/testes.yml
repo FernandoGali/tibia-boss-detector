@@ -7,6 +7,11 @@ on:
   push:
   pull_request:
 
+# PERMISSÃO MÍNIMA #
+# O CI só precisa ler o código; não pode alterar nada no repositório #
+permissions:
+  contents: read
+
 jobs:
   testes:
     runs-on: ubuntu-latest
@@ -35,11 +40,16 @@ jobs:
       DATABASE_URL: postgresql://boss_detector:senha_de_teste@localhost:5432/boss_detector
 
     steps:
-      # Baixa o código do repositório #
-      - uses: actions/checkout@v4
+      # As ações ficam presas a um código exato de versão (SHA), para ninguém trocar #
+      # o que elas fazem sem a gente perceber. O Dependabot atualiza esses códigos #
+
+      # Baixa o código do repositório, sem deixar a senha do GitHub guardada na máquina #
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Instala o Python #
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
           cache: pip

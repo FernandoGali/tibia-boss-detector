@@ -1,0 +1,22 @@
+# DEPENDABOT #
+# Uma vez por semana, confere se as bibliotecas e as ações do CI têm versão nova #
+# Quando tem, abre um pull request sozinho; o CI testa e você só aprova #
+
+version: 2
+
+updates:
+  # Bibliotecas do requirements.txt #
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    # Junta as atualizações pequenas num pull request só #
+    groups:
+      bibliotecas:
+        update-types: [minor, patch]
+
+  # Ações usadas no .github/workflows #
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
