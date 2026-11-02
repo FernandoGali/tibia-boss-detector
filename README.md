@@ -1,5 +1,7 @@
 # Tibia Boss Detector
 
+[![Testes](https://github.com/FernandoGali/tibia-boss-detector/actions/workflows/testes.yml/badge.svg)](https://github.com/FernandoGali/tibia-boss-detector/actions/workflows/testes.yml)
+
 Projeto pessoal pra ajudar a encontrar criaturas raras e bosses no Tibia.
 
 A ideia é simples: as kill statistics de cada mundo mostram quantas vezes cada criatura morreu no último dia. Se um boss aparece com morte num mundo, é porque ele nasceu lá. Guardando isso todo dia, dá pra montar um histórico de onde e com que frequência cada criatura aparece.
