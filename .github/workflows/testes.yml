@@ -1,0 +1,51 @@
+# TESTES AUTOMÁTICOS #
+# A cada push ou pull request, o GitHub roda todos os testes numa máquina dele #
+
+name: Testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+
+    # BANCO DE TESTES #
+    # Um PostgreSQL temporário, que só existe enquanto os testes rodam #
+    # A senha é descartável e não tem nada a ver com a do .env #
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: boss_detector
+          POSTGRES_PASSWORD: senha_de_teste
+          POSTGRES_DB: boss_detector_teste
+        ports:
+          - 5432:5432
+        # Espera o banco ficar pronto antes de começar #
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Faz o mesmo papel do .env #
+    env:
+      DATABASE_URL: postgresql://boss_detector:senha_de_teste@localhost:5432/boss_detector
+
+    steps:
+      # Baixa o código do repositório #
+      - uses: actions/checkout@v4
+
+      # Instala o Python #
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      # Instala as bibliotecas do requirements.txt #
+      - run: pip install -r requirements.txt
+
+      # Roda os testes #
+      - run: python -m pytest

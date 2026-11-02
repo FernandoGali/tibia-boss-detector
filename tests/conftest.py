@@ -25,23 +25,33 @@ def limpar_banco():
         conexao.execute("TRUNCATE snapshots, coletas, sentinelas, leituras_sentinela RESTART IDENTITY")
 
 
+    # FUNÇÃO : SEM BANCO DE TESTES #
+    # No computador, o teste é pulado (skip) #
+    # No GitHub (CI), o teste falha: lá o banco sempre tem que existir #
+def sem_banco_teste(motivo):
+
+    if os.getenv("CI"):
+        pytest.fail(motivo)
+
+    pytest.skip(motivo)
+
+
     # PREPARAÇÃO : BANCO DE TESTES #
     # Todo teste que pede "banco_teste" roda no banco de testes, vazio #
-    # Se o banco de testes não existir, o teste é pulado (skip) em vez de falhar #
 @pytest.fixture
 def banco_teste(monkeypatch):
 
     url = os.getenv("DATABASE_URL")
 
     if not url:
-        pytest.skip("DATABASE_URL não encontrado no .env")
+        sem_banco_teste("DATABASE_URL não encontrado no .env")
 
     url_teste = make_conninfo(url, dbname=nome_banco_teste)
 
     try:
         psycopg.connect(url_teste).close()
     except psycopg.OperationalError:
-        pytest.skip(f"Banco '{nome_banco_teste}' não existe (veja o README)")
+        sem_banco_teste(f"Banco '{nome_banco_teste}' não existe (veja o README)")
 
     # A partir daqui, banco.conectar() usa o banco de testes #
     monkeypatch.setenv("DATABASE_URL", url_teste)
