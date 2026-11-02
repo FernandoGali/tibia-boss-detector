@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import banco
 import sentinela
@@ -100,3 +100,76 @@ def test_verificar_sentinelas_api_fora_do_ar(conexao, monkeypatch):
     sentinela.verificar_sentinelas(conexao, mundos, as_horas(2))
 
     assert banco.ultima_leitura(conexao, "Antica") is None
+
+
+    # TESTE : SENTINELA PARA DEPOIS DE ATUALIZAR #
+    # Atualizou às 04:05 de 02/11: até a 01:05 de 03/11 a API nem é consultada #
+    # Às 02:05 de 03/11 (hora da virada) volta a consultar #
+def test_sentinela_para_depois_de_atualizar(conexao, monkeypatch):
+
+    consultados = []
+    kills = {"valor": 5}
+
+    def consultar_falso(mundo):
+        consultados.append(mundo)
+        return dados_falsos(kills["valor"])
+
+    monkeypatch.setattr(sentinela, "consultar_api", consultar_falso)
+
+    sentinela.verificar_sentinelas(conexao, mundos, as_horas(3))
+    kills["valor"] = 8
+    sentinela.verificar_sentinelas(conexao, mundos, as_horas(4))
+
+    consultados.clear()
+    sentinela.verificar_sentinelas(conexao, mundos, as_horas(5))
+    sentinela.verificar_sentinelas(conexao, mundos, as_horas(4) + timedelta(hours=21))
+
+    assert consultados == []
+
+    sentinela.verificar_sentinelas(conexao, mundos, as_horas(4) + timedelta(hours=22))
+
+    assert consultados == ["Antica", "Secura"]
+
+    # TESTE : CADA SENTINELA PARA SOZINHA #
+    # A Antica atualizou e a Secura ainda não: só a Secura continua sendo consultada #
+def test_sentinela_que_nao_atualizou_continua(conexao, monkeypatch):
+
+    consultados = []
+    kills = {"Antica": 5, "Secura": 5}
+
+    def consultar_falso(mundo):
+        consultados.append(mundo)
+        return dados_falsos(kills[mundo])
+
+    monkeypatch.setattr(sentinela, "consultar_api", consultar_falso)
+
+    sentinela.verificar_sentinelas(conexao, mundos, as_horas(3))
+    kills["Antica"] = 8
+    sentinela.verificar_sentinelas(conexao, mundos, as_horas(4))
+
+    consultados.clear()
+    sentinela.verificar_sentinelas(conexao, mundos, as_horas(5))
+
+    assert consultados == ["Secura"]
+
+    # TESTE : LIMPAR LEITURAS ANTIGAS #
+    # Leitura de 31 dias atrás é apagada; a de 29 dias atrás fica #
+def test_limpar_leituras_antigas(conexao):
+
+    agora = as_horas(4)
+
+    for dias, mundo in [(31, "Antica"), (29, "Secura")]:
+        banco.salvar_leitura(conexao, {
+            "mundo": mundo,
+            "regiao": "Europe",
+            "horario": agora - timedelta(days=dias),
+            "timestamp_api": None,
+            "kills_24h_total": 5,
+            "kills_7d_total": 5,
+            "mudou": True
+        })
+
+    sentinela.limpar_leituras_antigas(conexao, agora)
+
+    assert banco.ultima_leitura(conexao, "Antica") is None
+    assert banco.ultima_leitura(conexao, "Secura") is not None

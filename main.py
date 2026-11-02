@@ -3,7 +3,7 @@ import logging
 import banco
 from coletor import coletar_pendentes
 from registro import configurar_log, registrar
-from sentinela import verificar_sentinelas
+from sentinela import limpar_leituras_antigas, verificar_sentinelas
 from tempo import agora_tibia, fuso_brasilia
 from tibia import consultar_mundos
 
@@ -28,6 +28,7 @@ def main():
     with banco.conectar() as conexao:
         verificar_sentinelas(conexao, mundos, agora)
         coletar_pendentes(conexao, mundos, agora)
+        limpar_leituras_antigas(conexao, agora)
 
 if __name__ == "__main__":
 

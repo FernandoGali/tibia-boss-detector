@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 import banco
 from registro import registrar
+from tempo import data_atividade
 from tibia import calcular_resumo, consultar_api
 
     # QUANTIDADE DE SENTINELAS POR REGIÃO #
@@ -10,6 +13,9 @@ sentinelas_por_regiao = {
     "South America": 2,
     "Oceania": 1
 }
+
+    # QUANTO TEMPO GUARDAR AS LEITURAS #
+dias_guardar_leituras = 30
 
     # FUNÇÕES #
 
@@ -62,15 +68,32 @@ def verificar_mudanca(anterior, resumo):
         or anterior["kills_7d_total"] != resumo["kills_7d_total"]
     )
 
+    # FUNÇÃO : JÁ ATUALIZOU HOJE #
+    # True se a sentinela já viu a atualização do dia; aí não precisa consultar de novo #
+    # Volta a consultar às 02:00 de Berlim (hora_virada), quando começa o dia seguinte #
+def ja_atualizou_hoje(ultima_mudanca, agora):
+
+    return ultima_mudanca is not None and data_atividade(ultima_mudanca) >= data_atividade(agora)
+
     # FUNÇÃO : VERIFICAR SENTINELAS #
     # Consulta cada sentinela, compara com a leitura anterior e grava no banco #
+    # Cada sentinela para depois de ver a própria atualização do dia #
 def verificar_sentinelas(conexao, mundos, agora):
 
     sentinelas = carregar_sentinelas(conexao, mundos)
+    mudancas = banco.ultimas_mudancas(conexao)
+
+    pausadas = [s["mundo"] for s in sentinelas if ja_atualizou_hoje(mudancas.get(s["mundo"]), agora)]
+
+    if pausadas:
+        registrar("Sentinelas que já atualizaram hoje: " + ", ".join(pausadas))
 
     for sentinela in sentinelas:
 
         mundo = sentinela["mundo"]
+
+        if mundo in pausadas:
+            continue
 
         dados = consultar_api(mundo)
 
@@ -99,3 +122,12 @@ def verificar_sentinelas(conexao, mundos, agora):
             situacao = "sem mudança"
 
         registrar(f"Sentinela {mundo} ({sentinela['regiao']}) - {situacao}")
+
+    # FUNÇÃO : LIMPAR LEITURAS ANTIGAS #
+    # Apaga as leituras com mais de 30 dias, para a tabela não crescer sem parar #
+def limpar_leituras_antigas(conexao, agora):
+
+    apagadas = banco.apagar_leituras_antigas(conexao, agora - timedelta(days=dias_guardar_leituras))
+
+    if apagadas:
+        registrar(f"{apagadas} leituras antigas da sentinela apagadas")

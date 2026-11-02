@@ -159,6 +159,26 @@ def salvar_leitura(conexao, leitura):
         leitura["mudou"]
     ))
 
+    # FUNÇÃO : ÚLTIMAS MUDANÇAS DE CADA MUNDO #
+    # Horário em que cada sentinela viu a última atualização, numa consulta só #
+    # Devolve um dicionário: {"Antica": horário, "Secura": horário, ...} #
+def ultimas_mudancas(conexao):
+
+    comando = """
+        SELECT mundo, MAX(horario) AS horario
+        FROM leituras_sentinela
+        WHERE mudou = TRUE
+        GROUP BY mundo
+    """
+
+    return {linha["mundo"]: linha["horario"] for linha in conexao.execute(comando).fetchall()}
+
+    # FUNÇÃO : APAGAR LEITURAS ANTIGAS #
+    # Só as leituras recentes importam; as antigas só ocupam espaço #
+def apagar_leituras_antigas(conexao, limite):
+
+    return conexao.execute("DELETE FROM leituras_sentinela WHERE horario < %s", (limite,)).rowcount
+
     # FUNÇÃO : ÚLTIMA ATUALIZAÇÃO DA REGIÃO #
     # Horário da leitura mais recente em que uma sentinela da região mudou #
     # None = o sentinela ainda não viu nenhuma atualização nessa região #
