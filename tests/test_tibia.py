@@ -33,6 +33,22 @@ def test_consultar_api_falha_conexao(monkeypatch):
     assert consultar_api("Kalibra") is None
 
 
+    # TESTE : MUNDO NOVO SEM KILL STATISTICS #
+    # No dia do lançamento a API responde 200, mas com a lista de mortes vazia (null) #
+    # A consulta tem que retornar None, como numa falha, e tentar de novo depois #
+def test_consultar_api_mundo_novo_sem_kill_statistics(monkeypatch):
+
+    class RespostaFalsa:
+        status_code = 200
+
+        def json(self):
+            return {"killstatistics": {"world": "Quirina", "entries": None}}
+
+    monkeypatch.setattr(requests, "get", lambda url, timeout: RespostaFalsa())
+
+    assert consultar_api("Quirina") is None
+
+
     # TESTE : CALCULAR RESUMO #
     # Soma as kills de 24h e de 7 dias de todas as criaturas #
 def test_calcular_resumo_soma_as_kills():

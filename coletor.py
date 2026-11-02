@@ -1,3 +1,4 @@
+import logging
 import time
 
 import banco
@@ -127,8 +128,13 @@ def coletar_pendentes(mundos, agora):
         gravados = 0
 
         for mundo in pendentes:
-            if coletar_mundo(mundo, regiao, dia, agora):
-                gravados += 1
+
+            # Um erro num mundo não pode parar a coleta dos outros #
+            try:
+                if coletar_mundo(mundo, regiao, dia, agora):
+                    gravados += 1
+            except Exception:
+                logging.exception(f"{mundo} - erro ao coletar, tenta na próxima hora")
 
             time.sleep(pausa_entre_consultas)
 

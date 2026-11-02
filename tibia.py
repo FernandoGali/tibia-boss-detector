@@ -40,7 +40,14 @@ def consultar_api(mundo):
         registrar(f"Erro ao consultar API: {resposta.status_code}")
         return None
 
-    return resposta.json()
+    dados = resposta.json()
+
+    # Mundo recém-lançado ainda não tem kill statistics: a API devolve a lista vazia #
+    if not dados.get("killstatistics", {}).get("entries"):
+        registrar(f"{mundo} - ainda sem kill statistics")
+        return None
+
+    return dados
 
     # FUNÇÃO : CONSULTAR MUNDOS #
     # Busca a lista de mundos normais (sem os de torneio) #
