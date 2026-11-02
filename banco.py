@@ -2,6 +2,7 @@ import os
 
 import psycopg
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 from dotenv import load_dotenv
 
     # CONFIGURAÇÃO #
@@ -57,48 +58,75 @@ CREATE TABLE IF NOT EXISTS leituras_sentinela (
 
     # FUNÇÕES #
 
-    # FUNÇÃO : CONECTAR #
+    # CONFIGURAÇÃO DAS CONEXÕES #
     # dict_row faz cada linha vir como dicionário: linha["mundo"] em vez de linha[0] #
-def conectar():
+    # autocommit grava cada comando na hora; quando precisa de "tudo ou nada", #
+    # a função abre uma transação (conexao.transaction()) #
+opcoes_conexao = {"row_factory": dict_row, "autocommit": True}
+
+    # TAMANHO DO POOL DA API #
+    # Poucas conexões abertas: o servidor é pequeno e cada conexão ocupa memória #
+pool_minimo = 1
+pool_maximo = 4
+
+    # FUNÇÃO : URL DO BANCO #
+def url_banco():
 
     url = os.getenv("DATABASE_URL")
 
     if not url:
         raise RuntimeError("DATABASE_URL não encontrado. Crie o arquivo .env (veja o README).")
 
-    return psycopg.connect(url, row_factory=dict_row)
+    return url
+
+    # FUNÇÃO : CONECTAR #
+    # Uma conexão só, usada do começo ao fim de cada execução do main.py #
+def conectar():
+
+    return psycopg.connect(url_banco(), **opcoes_conexao)
+
+    # FUNÇÃO : CRIAR POOL #
+    # Para a API: conexões que ficam abertas e são reaproveitadas a cada pedido #
+    # O pool só abre quando a API liga (with banco.criar_pool() as pool) #
+def criar_pool():
+
+    return ConnectionPool(
+        url_banco(),
+        min_size=pool_minimo,
+        max_size=pool_maximo,
+        kwargs=opcoes_conexao,
+        open=False
+    )
 
     # FUNÇÃO : CRIAR TABELAS #
     # Pode rodar quantas vezes quiser: só cria o que ainda não existe #
-def criar_tabelas():
+def criar_tabelas(conexao):
 
-    with conectar() as conexao:
-        conexao.execute(tabelas)
+    conexao.execute(tabelas)
 
 
     # SENTINELA #
 
     # FUNÇÃO : LISTAR SENTINELAS #
-def listar_sentinelas():
+def listar_sentinelas(conexao):
 
-    with conectar() as conexao:
-        return conexao.execute("SELECT mundo, regiao FROM sentinelas").fetchall()
+    return conexao.execute("SELECT mundo, regiao FROM sentinelas").fetchall()
 
     # FUNÇÃO : TROCAR SENTINELAS #
-    # Apaga as sentinelas antigas e grava as novas #
-def trocar_sentinelas(sentinelas):
+    # Apaga as sentinelas antigas e grava as novas, tudo ou nada #
+def trocar_sentinelas(conexao, sentinelas):
 
-    with conectar() as conexao:
+    with conexao.transaction():
+
         conexao.execute("DELETE FROM sentinelas")
 
-        for sentinela in sentinelas:
-            conexao.execute(
-                "INSERT INTO sentinelas (mundo, regiao) VALUES (%s, %s)",
-                (sentinela["mundo"], sentinela["regiao"])
-            )
+        conexao.cursor().executemany(
+            "INSERT INTO sentinelas (mundo, regiao) VALUES (%s, %s)",
+            [(s["mundo"], s["regiao"]) for s in sentinelas]
+        )
 
     # FUNÇÃO : ÚLTIMA LEITURA DO MUNDO #
-def ultima_leitura(mundo):
+def ultima_leitura(conexao, mundo):
 
     comando = """
         SELECT kills_24h_total, kills_7d_total
@@ -108,11 +136,10 @@ def ultima_leitura(mundo):
         LIMIT 1
     """
 
-    with conectar() as conexao:
-        return conexao.execute(comando, (mundo,)).fetchone()
+    return conexao.execute(comando, (mundo,)).fetchone()
 
     # FUNÇÃO : SALVAR LEITURA #
-def salvar_leitura(leitura):
+def salvar_leitura(conexao, leitura):
 
     comando = """
         INSERT INTO leituras_sentinela (
@@ -122,21 +149,20 @@ def salvar_leitura(leitura):
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
 
-    with conectar() as conexao:
-        conexao.execute(comando, (
-            leitura["mundo"],
-            leitura["regiao"],
-            leitura["horario"],
-            leitura["timestamp_api"],
-            leitura["kills_24h_total"],
-            leitura["kills_7d_total"],
-            leitura["mudou"]
-        ))
+    conexao.execute(comando, (
+        leitura["mundo"],
+        leitura["regiao"],
+        leitura["horario"],
+        leitura["timestamp_api"],
+        leitura["kills_24h_total"],
+        leitura["kills_7d_total"],
+        leitura["mudou"]
+    ))
 
     # FUNÇÃO : ÚLTIMA ATUALIZAÇÃO DA REGIÃO #
     # Horário da leitura mais recente em que uma sentinela da região mudou #
     # None = o sentinela ainda não viu nenhuma atualização nessa região #
-def ultima_atualizacao(regiao):
+def ultima_atualizacao(conexao, regiao):
 
     comando = """
         SELECT MAX(horario) AS horario
@@ -144,26 +170,24 @@ def ultima_atualizacao(regiao):
         WHERE regiao = %s AND mudou = TRUE
     """
 
-    with conectar() as conexao:
-        return conexao.execute(comando, (regiao,)).fetchone()["horario"]
+    return conexao.execute(comando, (regiao,)).fetchone()["horario"]
 
 
     # COLETOR #
 
     # FUNÇÃO : MUNDOS JÁ COLETADOS #
     # Devolve os nomes dos mundos que já têm coleta para aquele dia #
-def mundos_coletados(data_atividade):
+def mundos_coletados(conexao, data_atividade):
 
-    with conectar() as conexao:
-        linhas = conexao.execute(
-            "SELECT mundo FROM coletas WHERE data_atividade = %s",
-            (data_atividade,)
-        ).fetchall()
+    linhas = conexao.execute(
+        "SELECT mundo FROM coletas WHERE data_atividade = %s",
+        (data_atividade,)
+    ).fetchall()
 
     return {linha["mundo"] for linha in linhas}
 
     # FUNÇÃO : ÚLTIMA COLETA DO MUNDO #
-def ultima_coleta(mundo):
+def ultima_coleta(conexao, mundo):
 
     comando = """
         SELECT kills_24h_total, kills_7d_total
@@ -173,13 +197,12 @@ def ultima_coleta(mundo):
         LIMIT 1
     """
 
-    with conectar() as conexao:
-        return conexao.execute(comando, (mundo,)).fetchone()
+    return conexao.execute(comando, (mundo,)).fetchone()
 
     # FUNÇÃO : SALVAR COLETA #
     # Grava o resumo do mundo e as criaturas raras juntos #
     # Se der erro no meio, nada é gravado (tudo ou nada) #
-def salvar_coleta(coleta, registros):
+def salvar_coleta(conexao, coleta, registros):
 
     comando_coleta = """
         INSERT INTO coletas (
@@ -199,7 +222,8 @@ def salvar_coleta(coleta, registros):
         ON CONFLICT (mundo, criatura, data_atividade) DO NOTHING
     """
 
-    with conectar() as conexao:
+    # executemany manda todos os snapshots de uma vez, em vez de um por um #
+    with conexao.transaction():
 
         conexao.execute(comando_coleta, (
             coleta["mundo"],
@@ -211,8 +235,8 @@ def salvar_coleta(coleta, registros):
             coleta["kills_7d_total"]
         ))
 
-        for registro in registros:
-            conexao.execute(comando_snapshot, (
+        conexao.cursor().executemany(comando_snapshot, [
+            (
                 registro["mundo"],
                 registro["criatura"],
                 registro["data"],
@@ -221,14 +245,16 @@ def salvar_coleta(coleta, registros):
                 registro["kills_7d"],
                 registro["encontrada_na_api"],
                 registro["timestamp_api"]
-            ))
+            )
+            for registro in registros
+        ])
 
 
     # SITE #
 
     # FUNÇÃO : LISTAR MUNDOS #
     # Os mundos que já têm coleta, com a região, em ordem alfabética #
-def listar_mundos():
+def listar_mundos(conexao):
 
     comando = """
         SELECT DISTINCT mundo, regiao
@@ -236,13 +262,12 @@ def listar_mundos():
         ORDER BY mundo
     """
 
-    with conectar() as conexao:
-        return conexao.execute(comando).fetchall()
+    return conexao.execute(comando).fetchall()
 
     # FUNÇÃO : CONSULTAR SEMÁFORO #
     # A mesma consulta do consulta_semaforo.sql, agora com o mundo, as criaturas #
     # e a data de hoje vindo de fora (%(nome)s), mais as últimas 3 aparições #
-def consultar_semaforo(mundo, criaturas, hoje):
+def consultar_semaforo(conexao, mundo, criaturas, hoje):
 
     comando = """
         WITH resumo AS (
@@ -285,10 +310,10 @@ def consultar_semaforo(mundo, criaturas, hoje):
 
     parametros = {"mundo": mundo, "criaturas": criaturas, "hoje": hoje}
 
-    with conectar() as conexao:
-        return conexao.execute(comando, parametros).fetchall()
+    return conexao.execute(comando, parametros).fetchall()
 
 
 if __name__ == "__main__":
-    criar_tabelas()
+    with conectar() as conexao:
+        criar_tabelas(conexao)
     print("Tabelas criadas (ou já existiam).")

@@ -2,6 +2,11 @@ import requests
 
 from registro import registrar
 
+    # SESSÃO #
+    # Reaproveita a mesma conexão com o TibiaData em todas as consultas, #
+    # em vez de abrir e fechar uma conexão para cada mundo #
+sessao = requests.Session()
+
     # FUNÇÕES #
 
     # FUNÇÃO : CONSULTAR API #
@@ -10,7 +15,7 @@ def consultar_api(mundo):
     url = f"https://api.tibiadata.com/v4/killstatistics/{mundo}"
 
     try:
-        resposta = requests.get(url, timeout=10)
+        resposta = sessao.get(url, timeout=10)
     except requests.exceptions.RequestException:
         registrar("Falha de conexão com a API.")
         return None
@@ -35,7 +40,7 @@ def consultar_mundos():
     url = "https://api.tibiadata.com/v4/worlds"
 
     try:
-        resposta = requests.get(url, timeout=10)
+        resposta = sessao.get(url, timeout=10)
     except requests.exceptions.RequestException:
         registrar("Falha de conexão com a API.")
         return None

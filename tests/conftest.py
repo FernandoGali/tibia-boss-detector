@@ -15,15 +15,12 @@ nome_banco_teste = "boss_detector_teste"
     # FUNÇÃO : LIMPAR BANCO #
     # Apaga todas as linhas das tabelas (TRUNCATE), mas mantém as tabelas #
     # Antes, confere se está mesmo no banco de testes #
-def limpar_banco():
+def limpar_banco(conexao):
 
-    with banco.conectar() as conexao:
+    nome_atual = conexao.execute("SELECT current_database() AS nome").fetchone()["nome"]
+    assert nome_atual == nome_banco_teste, "Tentou limpar um banco que não é o de testes!"
 
-        nome_atual = conexao.execute("SELECT current_database() AS nome").fetchone()["nome"]
-        assert nome_atual == nome_banco_teste, "Tentou limpar um banco que não é o de testes!"
-
-        conexao.execute("TRUNCATE snapshots, coletas, sentinelas, leituras_sentinela RESTART IDENTITY")
-
+    conexao.execute("TRUNCATE snapshots, coletas, sentinelas, leituras_sentinela RESTART IDENTITY")
 
     # FUNÇÃO : SEM BANCO DE TESTES #
     # No computador, o teste é pulado (skip) #
@@ -36,29 +33,28 @@ def sem_banco_teste(motivo):
     pytest.skip(motivo)
 
 
-    # PREPARAÇÃO : BANCO DE TESTES #
-    # Todo teste que pede "banco_teste" roda no banco de testes, vazio #
+    # PREPARAÇÃO : CONEXÃO COM O BANCO DE TESTES #
+    # Todo teste que pede "conexao" recebe uma conexão com o banco de testes, vazio #
 @pytest.fixture
-def banco_teste(monkeypatch):
+def conexao(monkeypatch):
 
     url = os.getenv("DATABASE_URL")
 
     if not url:
         sem_banco_teste("DATABASE_URL não encontrado no .env")
 
-    url_teste = make_conninfo(url, dbname=nome_banco_teste)
+    # A partir daqui, banco.conectar() usa o banco de testes #
+    monkeypatch.setenv("DATABASE_URL", make_conninfo(url, dbname=nome_banco_teste))
 
     try:
-        psycopg.connect(url_teste).close()
+        conexao = banco.conectar()
     except psycopg.OperationalError:
         sem_banco_teste(f"Banco '{nome_banco_teste}' não existe (veja o README)")
 
-    # A partir daqui, banco.conectar() usa o banco de testes #
-    monkeypatch.setenv("DATABASE_URL", url_teste)
+    with conexao:
+        banco.criar_tabelas(conexao)
+        limpar_banco(conexao)
 
-    banco.criar_tabelas()
-    limpar_banco()
+        yield conexao
 
-    yield
-
-    limpar_banco()
+        limpar_banco(conexao)

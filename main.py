@@ -1,5 +1,6 @@
 import logging
 
+import banco
 from coletor import coletar_pendentes
 from registro import configurar_log, registrar
 from sentinela import verificar_sentinelas
@@ -23,8 +24,10 @@ def main():
         registrar("Não foi possível buscar a lista de mundos, tenta na próxima hora")
         return
 
-    verificar_sentinelas(mundos, agora)
-    coletar_pendentes(mundos, agora)
+    # Uma conexão só com o banco para a execução inteira #
+    with banco.conectar() as conexao:
+        verificar_sentinelas(conexao, mundos, agora)
+        coletar_pendentes(conexao, mundos, agora)
 
 if __name__ == "__main__":
 

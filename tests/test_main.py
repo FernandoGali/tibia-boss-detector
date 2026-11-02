@@ -1,17 +1,22 @@
+from contextlib import nullcontext
+
+import banco
 import main
 
 
     # TESTES #
     # O sentinela e o coletor são trocados por funções falsas que só anotam se foram chamadas #
+    # O banco é trocado por uma conexão vazia (nullcontext), então não precisa do PostgreSQL #
 
     # AJUDANTE : PREPARAR MAIN #
 def preparar_main(monkeypatch, mundos):
 
     chamadas = []
 
+    monkeypatch.setattr(banco, "conectar", nullcontext)
     monkeypatch.setattr(main, "consultar_mundos", lambda: mundos)
-    monkeypatch.setattr(main, "verificar_sentinelas", lambda mundos, agora: chamadas.append("sentinela"))
-    monkeypatch.setattr(main, "coletar_pendentes", lambda mundos, agora: chamadas.append("coletor"))
+    monkeypatch.setattr(main, "verificar_sentinelas", lambda conexao, mundos, agora: chamadas.append("sentinela"))
+    monkeypatch.setattr(main, "coletar_pendentes", lambda conexao, mundos, agora: chamadas.append("coletor"))
 
     return chamadas
 

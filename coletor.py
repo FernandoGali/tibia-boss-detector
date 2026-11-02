@@ -52,7 +52,7 @@ def dados_repetidos(anterior, resumo):
     # FUNÇÃO : COLETAR MUNDO #
     # Consulta um mundo e grava, se os dados forem novos #
     # Devolve True se gravou #
-def coletar_mundo(mundo, regiao, dia, agora):
+def coletar_mundo(conexao, mundo, regiao, dia, agora):
 
     dados = consultar_api(mundo)
 
@@ -62,7 +62,7 @@ def coletar_mundo(mundo, regiao, dia, agora):
 
     resumo = calcular_resumo(dados)
 
-    if dados_repetidos(banco.ultima_coleta(mundo), resumo):
+    if dados_repetidos(banco.ultima_coleta(conexao, mundo), resumo):
         registrar(f"{mundo} - ainda não atualizou, tenta na próxima hora")
         return False
 
@@ -78,26 +78,26 @@ def coletar_mundo(mundo, regiao, dia, agora):
         "kills_7d_total": resumo["kills_7d_total"]
     }
 
-    banco.salvar_coleta(coleta, registros)
+    banco.salvar_coleta(conexao, coleta, registros)
 
     return True
 
     # FUNÇÃO : COLETAR PENDENTES #
     # Para cada região, coleta os mundos que ainda não têm o dia da última atualização #
-def coletar_pendentes(mundos, agora):
+def coletar_pendentes(conexao, mundos, agora):
 
     regioes = sorted({m["location"] for m in mundos})
 
     for regiao in regioes:
 
-        atualizacao = banco.ultima_atualizacao(regiao)
+        atualizacao = banco.ultima_atualizacao(conexao, regiao)
 
         if atualizacao is None:
             registrar(f"{regiao} - o sentinela ainda não detectou nenhuma atualização")
             continue
 
         dia = data_atividade(atualizacao)
-        ja_coletados = banco.mundos_coletados(dia)
+        ja_coletados = banco.mundos_coletados(conexao, dia)
 
         pendentes = [m["name"] for m in mundos if m["location"] == regiao and m["name"] not in ja_coletados]
 
@@ -112,7 +112,7 @@ def coletar_pendentes(mundos, agora):
 
             # Um erro num mundo não pode parar a coleta dos outros #
             try:
-                if coletar_mundo(mundo, regiao, dia, agora):
+                if coletar_mundo(conexao, mundo, regiao, dia, agora):
                     gravados += 1
             except Exception:
                 logging.exception(f"{mundo} - erro ao coletar, tenta na próxima hora")

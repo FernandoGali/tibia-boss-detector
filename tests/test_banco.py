@@ -3,7 +3,7 @@ from datetime import date, datetime
 import banco
 from tempo import fuso_tibia
 
-    # Todos os testes deste arquivo usam o banco de testes (banco_teste) #
+    # Todos os testes deste arquivo usam o banco de testes (conexao) #
 
 
     # AJUDANTES #
@@ -16,7 +16,7 @@ def nov(dia):
 
     # AJUDANTE : GRAVAR SNAPSHOTS #
     # Grava uma criatura com kills nos dias_com_kill e 0 kills nos dias_sem_kill #
-def gravar_snapshots(mundo, criatura, dias_com_kill, dias_sem_kill=()):
+def gravar_snapshots(conexao, mundo, criatura, dias_com_kill, dias_sem_kill=()):
 
     comando = """
         INSERT INTO snapshots (
@@ -26,19 +26,17 @@ def gravar_snapshots(mundo, criatura, dias_com_kill, dias_sem_kill=()):
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
 
-    with banco.conectar() as conexao:
+    for dia in dias_com_kill:
+        conexao.execute(comando, (mundo, criatura, dia, dia, 1, 1, True))
 
-        for dia in dias_com_kill:
-            conexao.execute(comando, (mundo, criatura, dia, dia, 1, 1, True))
-
-        for dia in dias_sem_kill:
-            conexao.execute(comando, (mundo, criatura, dia, dia, 0, 0, False))
+    for dia in dias_sem_kill:
+        conexao.execute(comando, (mundo, criatura, dia, dia, 0, 0, False))
 
     # AJUDANTE : SEMÁFORO DE UMA CRIATURA #
     # Consulta uma criatura só e devolve a linha dela #
-def semaforo_de(criatura, hoje, mundo="Kalibra"):
+def semaforo_de(conexao, criatura, hoje, mundo="Kalibra"):
 
-    linhas = banco.consultar_semaforo(mundo, [criatura], hoje)
+    linhas = banco.consultar_semaforo(conexao, mundo, [criatura], hoje)
 
     assert len(linhas) == 1
 
@@ -76,11 +74,11 @@ def coleta_falsa(mundo, regiao, dia, kills_24h_total=10):
     # TESTE : SEMÁFORO ALTA #
     # Munster apareceu nos dias 1, 3 e 5: intervalo de 2 dias, próxima no dia 7 #
     # No dia 10, já faz 5 dias sem aparecer (mais que o intervalo) = alta #
-def test_semaforo_alta(banco_teste):
+def test_semaforo_alta(conexao):
 
-    gravar_snapshots("Kalibra", "Munster", [nov(1), nov(3), nov(5)], [nov(2), nov(4)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3), nov(5)], [nov(2), nov(4)])
 
-    linha = semaforo_de("Munster", nov(10))
+    linha = semaforo_de(conexao, "Munster", nov(10))
 
     assert linha["aparicoes"] == 3
     assert linha["ultima_aparicao"] == nov(5)
@@ -93,46 +91,46 @@ def test_semaforo_alta(banco_teste):
 
     # TESTE : SEMÁFORO ALTA NO DIA EXATO #
     # Intervalo de 4 dias e exatamente 4 dias sem aparecer: já conta como alta #
-def test_semaforo_alta_no_dia_previsto(banco_teste):
+def test_semaforo_alta_no_dia_previsto(conexao):
 
-    gravar_snapshots("Kalibra", "Munster", [nov(1), nov(5)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(5)])
 
-    assert semaforo_de("Munster", nov(9))["semaforo"] == "alta"
+    assert semaforo_de(conexao, "Munster", nov(9))["semaforo"] == "alta"
 
     # TESTE : SEMÁFORO MÉDIA #
     # Intervalo de 4 dias e 3 dias sem aparecer (passou da metade) = média #
-def test_semaforo_media(banco_teste):
+def test_semaforo_media(conexao):
 
-    gravar_snapshots("Kalibra", "Munster", [nov(1), nov(5)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(5)])
 
-    assert semaforo_de("Munster", nov(8))["semaforo"] == "média"
+    assert semaforo_de(conexao, "Munster", nov(8))["semaforo"] == "média"
 
     # TESTE : SEMÁFORO BAIXA #
     # Intervalo de 8 dias e só 1 dia sem aparecer = baixa #
-def test_semaforo_baixa(banco_teste):
+def test_semaforo_baixa(conexao):
 
-    gravar_snapshots("Kalibra", "Munster", [nov(1), nov(9)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(9)])
 
-    assert semaforo_de("Munster", nov(10))["semaforo"] == "baixa"
+    assert semaforo_de(conexao, "Munster", nov(10))["semaforo"] == "baixa"
 
     # TESTE : SÓ AS ÚLTIMAS 3 APARIÇÕES #
     # Apareceu 4 vezes, mas a lista mostra só as 3 mais recentes #
-def test_semaforo_mostra_so_as_3_ultimas(banco_teste):
+def test_semaforo_mostra_so_as_3_ultimas(conexao):
 
-    gravar_snapshots("Kalibra", "Munster", [nov(1), nov(2), nov(3), nov(4)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(2), nov(3), nov(4)])
 
-    linha = semaforo_de("Munster", nov(10))
+    linha = semaforo_de(conexao, "Munster", nov(10))
 
     assert linha["aparicoes"] == 4
     assert linha["ultimas_aparicoes"] == [nov(4), nov(3), nov(2)]
 
     # TESTE : UMA APARIÇÃO SÓ #
     # Com 1 aparição não dá para calcular intervalo: sem semáforo, com mensagem #
-def test_semaforo_uma_aparicao(banco_teste):
+def test_semaforo_uma_aparicao(conexao):
 
-    gravar_snapshots("Kalibra", "White Pale", [nov(1)], [nov(2), nov(3)])
+    gravar_snapshots(conexao, "Kalibra", "White Pale", [nov(1)], [nov(2), nov(3)])
 
-    linha = semaforo_de("White Pale", nov(10))
+    linha = semaforo_de(conexao, "White Pale", nov(10))
 
     assert linha["aparicoes"] == 1
     assert linha["ultimas_aparicoes"] == [nov(1)]
@@ -142,11 +140,11 @@ def test_semaforo_uma_aparicao(banco_teste):
 
     # TESTE : NUNCA APARECEU #
     # Só dias com 0 kills: lista vazia, sem semáforo, com mensagem #
-def test_semaforo_nunca_apareceu(banco_teste):
+def test_semaforo_nunca_apareceu(conexao):
 
-    gravar_snapshots("Kalibra", "Yeti", [], [nov(1), nov(2), nov(3)])
+    gravar_snapshots(conexao, "Kalibra", "Yeti", [], [nov(1), nov(2), nov(3)])
 
-    linha = semaforo_de("Yeti", nov(10))
+    linha = semaforo_de(conexao, "Yeti", nov(10))
 
     assert linha["aparicoes"] == 0
     assert linha["ultima_aparicao"] is None
@@ -156,13 +154,13 @@ def test_semaforo_nunca_apareceu(banco_teste):
 
     # TESTE : SÓ O MUNDO E AS CRIATURAS PEDIDAS #
     # O Munster de Antica e o Yakchal não podem entrar numa consulta do Munster em Kalibra #
-def test_semaforo_filtra_mundo_e_criaturas(banco_teste):
+def test_semaforo_filtra_mundo_e_criaturas(conexao):
 
-    gravar_snapshots("Kalibra", "Munster", [nov(1), nov(3)])
-    gravar_snapshots("Antica", "Munster", [nov(5), nov(7)])
-    gravar_snapshots("Kalibra", "Yakchal", [nov(2), nov(4)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3)])
+    gravar_snapshots(conexao, "Antica", "Munster", [nov(5), nov(7)])
+    gravar_snapshots(conexao, "Kalibra", "Yakchal", [nov(2), nov(4)])
 
-    linhas = banco.consultar_semaforo("Kalibra", ["Munster"], nov(10))
+    linhas = banco.consultar_semaforo(conexao, "Kalibra", ["Munster"], nov(10))
 
     assert len(linhas) == 1
     assert linhas[0]["criatura"] == "Munster"
@@ -170,14 +168,14 @@ def test_semaforo_filtra_mundo_e_criaturas(banco_teste):
 
     # TESTE : ORDEM DO RESULTADO #
     # Primeiro quem apareceu mais vezes; empate fica em ordem alfabética #
-def test_semaforo_ordem(banco_teste):
+def test_semaforo_ordem(conexao):
 
-    gravar_snapshots("Kalibra", "Yeti", [], [nov(1)])
-    gravar_snapshots("Kalibra", "Yakchal", [nov(1), nov(2), nov(3)])
-    gravar_snapshots("Kalibra", "Munster", [nov(1)])
-    gravar_snapshots("Kalibra", "Furyosa", [nov(2)])
+    gravar_snapshots(conexao, "Kalibra", "Yeti", [], [nov(1)])
+    gravar_snapshots(conexao, "Kalibra", "Yakchal", [nov(1), nov(2), nov(3)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1)])
+    gravar_snapshots(conexao, "Kalibra", "Furyosa", [nov(2)])
 
-    linhas = banco.consultar_semaforo("Kalibra", ["Yeti", "Yakchal", "Munster", "Furyosa"], nov(10))
+    linhas = banco.consultar_semaforo(conexao, "Kalibra", ["Yeti", "Yakchal", "Munster", "Furyosa"], nov(10))
 
     assert [l["criatura"] for l in linhas] == ["Yakchal", "Furyosa", "Munster", "Yeti"]
 
@@ -186,49 +184,48 @@ def test_semaforo_ordem(banco_teste):
 
     # TESTE : SALVAR COLETA #
     # Depois de salvar, o mundo aparece como coletado naquele dia, e só naquele dia #
-def test_salvar_coleta(banco_teste):
+def test_salvar_coleta(conexao):
 
-    banco.salvar_coleta(*coleta_falsa("Kalibra", "Europe", nov(1)))
+    banco.salvar_coleta(conexao, *coleta_falsa("Kalibra", "Europe", nov(1)))
 
-    assert banco.mundos_coletados(nov(1)) == {"Kalibra"}
-    assert banco.mundos_coletados(nov(2)) == set()
+    assert banco.mundos_coletados(conexao, nov(1)) == {"Kalibra"}
+    assert banco.mundos_coletados(conexao, nov(2)) == set()
 
     # TESTE : SALVAR O MESMO DIA DUAS VEZES #
     # A segunda vez é ignorada (ON CONFLICT DO NOTHING), sem erro e sem duplicar #
-def test_salvar_coleta_repetida_e_ignorada(banco_teste):
+def test_salvar_coleta_repetida_e_ignorada(conexao):
 
-    banco.salvar_coleta(*coleta_falsa("Kalibra", "Europe", nov(1), kills_24h_total=10))
-    banco.salvar_coleta(*coleta_falsa("Kalibra", "Europe", nov(1), kills_24h_total=99))
+    banco.salvar_coleta(conexao, *coleta_falsa("Kalibra", "Europe", nov(1), kills_24h_total=10))
+    banco.salvar_coleta(conexao, *coleta_falsa("Kalibra", "Europe", nov(1), kills_24h_total=99))
 
-    with banco.conectar() as conexao:
-        total_snapshots = conexao.execute("SELECT COUNT(*) AS total FROM snapshots").fetchone()["total"]
+    total_snapshots = conexao.execute("SELECT COUNT(*) AS total FROM snapshots").fetchone()["total"]
 
     assert total_snapshots == 1
-    assert banco.ultima_coleta("Kalibra")["kills_24h_total"] == 10
+    assert banco.ultima_coleta(conexao, "Kalibra")["kills_24h_total"] == 10
 
     # TESTE : ÚLTIMA COLETA #
     # Tem que devolver a do dia mais recente; mundo sem coleta = None #
-def test_ultima_coleta(banco_teste):
+def test_ultima_coleta(conexao):
 
-    banco.salvar_coleta(*coleta_falsa("Kalibra", "Europe", nov(2), kills_24h_total=20))
-    banco.salvar_coleta(*coleta_falsa("Kalibra", "Europe", nov(1), kills_24h_total=10))
+    banco.salvar_coleta(conexao, *coleta_falsa("Kalibra", "Europe", nov(2), kills_24h_total=20))
+    banco.salvar_coleta(conexao, *coleta_falsa("Kalibra", "Europe", nov(1), kills_24h_total=10))
 
-    assert banco.ultima_coleta("Kalibra")["kills_24h_total"] == 20
-    assert banco.ultima_coleta("Antica") is None
+    assert banco.ultima_coleta(conexao, "Kalibra")["kills_24h_total"] == 20
+    assert banco.ultima_coleta(conexao, "Antica") is None
 
 
     # TESTES : SITE #
 
     # TESTE : LISTAR MUNDOS #
     # Cada mundo aparece uma vez só, em ordem alfabética, com a região #
-def test_listar_mundos(banco_teste):
+def test_listar_mundos(conexao):
 
-    banco.salvar_coleta(*coleta_falsa("Kalibra", "Europe", nov(1)))
-    banco.salvar_coleta(*coleta_falsa("Kalibra", "Europe", nov(2)))
-    banco.salvar_coleta(*coleta_falsa("Antica", "Europe", nov(1)))
-    banco.salvar_coleta(*coleta_falsa("Inabra", "South America", nov(1)))
+    banco.salvar_coleta(conexao, *coleta_falsa("Kalibra", "Europe", nov(1)))
+    banco.salvar_coleta(conexao, *coleta_falsa("Kalibra", "Europe", nov(2)))
+    banco.salvar_coleta(conexao, *coleta_falsa("Antica", "Europe", nov(1)))
+    banco.salvar_coleta(conexao, *coleta_falsa("Inabra", "South America", nov(1)))
 
-    assert banco.listar_mundos() == [
+    assert banco.listar_mundos(conexao) == [
         {"mundo": "Antica", "regiao": "Europe"},
         {"mundo": "Inabra", "regiao": "South America"},
         {"mundo": "Kalibra", "regiao": "Europe"}
@@ -239,17 +236,17 @@ def test_listar_mundos(banco_teste):
 
     # TESTE : TROCAR SENTINELAS #
     # As sentinelas antigas somem e ficam só as novas #
-def test_trocar_sentinelas(banco_teste):
+def test_trocar_sentinelas(conexao):
 
-    banco.trocar_sentinelas([{"mundo": "Antica", "regiao": "Europe"}])
-    banco.trocar_sentinelas([{"mundo": "Secura", "regiao": "Europe"}])
+    banco.trocar_sentinelas(conexao, [{"mundo": "Antica", "regiao": "Europe"}])
+    banco.trocar_sentinelas(conexao, [{"mundo": "Secura", "regiao": "Europe"}])
 
-    assert banco.listar_sentinelas() == [{"mundo": "Secura", "regiao": "Europe"}]
+    assert banco.listar_sentinelas(conexao) == [{"mundo": "Secura", "regiao": "Europe"}]
 
     # TESTE : LEITURAS DA SENTINELA #
     # ultima_leitura = a mais recente do mundo #
     # ultima_atualizacao = a mais recente em que mudou, só daquela região #
-def test_leituras_sentinela(banco_teste):
+def test_leituras_sentinela(conexao):
 
     def leitura(mundo, regiao, hora, kills, mudou):
         return {
@@ -262,12 +259,12 @@ def test_leituras_sentinela(banco_teste):
             "mudou": mudou
         }
 
-    banco.salvar_leitura(leitura("Antica", "Europe", 2, 10, None))
-    banco.salvar_leitura(leitura("Antica", "Europe", 3, 20, True))
-    banco.salvar_leitura(leitura("Antica", "Europe", 4, 20, False))
+    banco.salvar_leitura(conexao, leitura("Antica", "Europe", 2, 10, None))
+    banco.salvar_leitura(conexao, leitura("Antica", "Europe", 3, 20, True))
+    banco.salvar_leitura(conexao, leitura("Antica", "Europe", 4, 20, False))
 
-    assert banco.ultima_leitura("Antica")["kills_24h_total"] == 20
-    assert banco.ultima_leitura("Secura") is None
+    assert banco.ultima_leitura(conexao, "Antica")["kills_24h_total"] == 20
+    assert banco.ultima_leitura(conexao, "Secura") is None
 
-    assert banco.ultima_atualizacao("Europe") == datetime(2026, 11, 2, 3, 5, tzinfo=fuso_tibia)
-    assert banco.ultima_atualizacao("Oceania") is None
+    assert banco.ultima_atualizacao(conexao, "Europe") == datetime(2026, 11, 2, 3, 5, tzinfo=fuso_tibia)
+    assert banco.ultima_atualizacao(conexao, "Oceania") is None

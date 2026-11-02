@@ -2,6 +2,7 @@ from datetime import datetime, date, timezone
 
 import requests
 
+import tibia
 from tempo import data_atividade, fuso_tibia
 from tibia import calcular_resumo, consultar_api
 
@@ -16,7 +17,7 @@ def test_consultar_api_status_erro(monkeypatch):
     class RespostaFalsa:
         status_code = 404
 
-    monkeypatch.setattr(requests, "get", lambda url, timeout: RespostaFalsa())
+    monkeypatch.setattr(tibia.sessao, "get", lambda url, timeout: RespostaFalsa())
 
     assert consultar_api("Kalibra") is None
 
@@ -29,7 +30,7 @@ def test_consultar_api_falha_conexao(monkeypatch):
     def conexao_falha(url, timeout):
         raise requests.exceptions.Timeout()
 
-    monkeypatch.setattr(requests, "get", conexao_falha)
+    monkeypatch.setattr(tibia.sessao, "get", conexao_falha)
 
     assert consultar_api("Kalibra") is None
 
@@ -45,7 +46,7 @@ def test_consultar_api_mundo_novo_sem_kill_statistics(monkeypatch):
         def json(self):
             return {"killstatistics": {"world": "Quirina", "entries": None}}
 
-    monkeypatch.setattr(requests, "get", lambda url, timeout: RespostaFalsa())
+    monkeypatch.setattr(tibia.sessao, "get", lambda url, timeout: RespostaFalsa())
 
     assert consultar_api("Quirina") is None
 

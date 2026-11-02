@@ -32,9 +32,9 @@ def escolher_sentinelas(mundos, sentinelas_por_regiao):
     # FUNÇÃO : CARREGAR SENTINELAS #
     # As sentinelas ficam fixas no banco, para comparar sempre os mesmos mundos #
     # Só escolhe de novo se algum mundo salvo deixou de existir #
-def carregar_sentinelas(mundos):
+def carregar_sentinelas(conexao, mundos):
 
-    sentinelas = banco.listar_sentinelas()
+    sentinelas = banco.listar_sentinelas(conexao)
 
     nomes_mundos = [m["name"] for m in mundos]
 
@@ -44,7 +44,7 @@ def carregar_sentinelas(mundos):
         return sentinelas
 
     sentinelas = escolher_sentinelas(mundos, sentinelas_por_regiao)
-    banco.trocar_sentinelas(sentinelas)
+    banco.trocar_sentinelas(conexao, sentinelas)
 
     registrar("Novas sentinelas escolhidas: " + ", ".join(s["mundo"] for s in sentinelas))
 
@@ -64,9 +64,9 @@ def verificar_mudanca(anterior, resumo):
 
     # FUNÇÃO : VERIFICAR SENTINELAS #
     # Consulta cada sentinela, compara com a leitura anterior e grava no banco #
-def verificar_sentinelas(mundos, agora):
+def verificar_sentinelas(conexao, mundos, agora):
 
-    sentinelas = carregar_sentinelas(mundos)
+    sentinelas = carregar_sentinelas(conexao, mundos)
 
     for sentinela in sentinelas:
 
@@ -79,9 +79,9 @@ def verificar_sentinelas(mundos, agora):
             continue
 
         resumo = calcular_resumo(dados)
-        mudou = verificar_mudanca(banco.ultima_leitura(mundo), resumo)
+        mudou = verificar_mudanca(banco.ultima_leitura(conexao, mundo), resumo)
 
-        banco.salvar_leitura({
+        banco.salvar_leitura(conexao, {
             "mundo": mundo,
             "regiao": sentinela["regiao"],
             "horario": agora,

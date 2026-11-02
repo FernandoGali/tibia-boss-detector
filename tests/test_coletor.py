@@ -72,7 +72,7 @@ def test_dados_repetidos():
 
 
     # TESTES : FLUXO DO COLETOR #
-    # Usam o banco de testes (banco_teste) e uma API falsa (monkeypatch) #
+    # Usam o banco de testes (conexao) e uma API falsa (monkeypatch) #
 
     # AJUDANTE : PREPARAR COLETA #
     # Sentinela da Europa atualizou às 04:05 de 02/11 (Berlim) = dia de atividade 01/11 #
@@ -85,12 +85,12 @@ mundos = [
     {"name": "Inabra", "location": "South America"}
 ]
 
-def preparar_coleta(monkeypatch, consultar_api):
+def preparar_coleta(conexao, monkeypatch, consultar_api):
 
     monkeypatch.setattr(coletor, "consultar_api", consultar_api)
     monkeypatch.setattr(coletor, "pausa_entre_consultas", 0)
 
-    banco.salvar_leitura({
+    banco.salvar_leitura(conexao, {
         "mundo": "Antica",
         "regiao": "Europe",
         "horario": agora,
@@ -103,17 +103,17 @@ def preparar_coleta(monkeypatch, consultar_api):
 
     # TESTE : COLETAR PENDENTES #
     # Grava só os mundos da região que atualizou, no dia certo #
-def test_coletar_pendentes_grava_regiao_que_atualizou(banco_teste, monkeypatch):
+def test_coletar_pendentes_grava_regiao_que_atualizou(conexao, monkeypatch):
 
-    preparar_coleta(monkeypatch, lambda mundo: dados_falsos(5))
+    preparar_coleta(conexao, monkeypatch, lambda mundo: dados_falsos(5))
 
-    coletor.coletar_pendentes(mundos, agora)
+    coletor.coletar_pendentes(conexao, mundos, agora)
 
-    assert banco.mundos_coletados(date(2026, 11, 1)) == {"Antica", "Kalibra"}
+    assert banco.mundos_coletados(conexao, date(2026, 11, 1)) == {"Antica", "Kalibra"}
 
     # TESTE : NÃO COLETA DUAS VEZES #
     # Na segunda rodada, os mundos já coletados nem são consultados #
-def test_coletar_pendentes_nao_repete(banco_teste, monkeypatch):
+def test_coletar_pendentes_nao_repete(conexao, monkeypatch):
 
     consultados = []
 
@@ -121,34 +121,34 @@ def test_coletar_pendentes_nao_repete(banco_teste, monkeypatch):
         consultados.append(mundo)
         return dados_falsos(5)
 
-    preparar_coleta(monkeypatch, consultar_falso)
+    preparar_coleta(conexao, monkeypatch, consultar_falso)
 
-    coletor.coletar_pendentes(mundos, agora)
+    coletor.coletar_pendentes(conexao, mundos, agora)
     consultados.clear()
-    coletor.coletar_pendentes(mundos, agora)
+    coletor.coletar_pendentes(conexao, mundos, agora)
 
     assert consultados == []
 
     # TESTE : ERRO EM UM MUNDO #
     # Se der erro na Antica, o Kalibra tem que ser gravado mesmo assim #
-def test_coletar_pendentes_continua_depois_de_erro(banco_teste, monkeypatch):
+def test_coletar_pendentes_continua_depois_de_erro(conexao, monkeypatch):
 
     def consultar_falso(mundo):
         if mundo == "Antica":
             raise ValueError("erro de teste")
         return dados_falsos(5)
 
-    preparar_coleta(monkeypatch, consultar_falso)
+    preparar_coleta(conexao, monkeypatch, consultar_falso)
 
-    coletor.coletar_pendentes(mundos, agora)
+    coletor.coletar_pendentes(conexao, mundos, agora)
 
-    assert banco.mundos_coletados(date(2026, 11, 1)) == {"Kalibra"}
+    assert banco.mundos_coletados(conexao, date(2026, 11, 1)) == {"Kalibra"}
 
     # TESTE : MUNDO QUE AINDA NÃO ATUALIZOU #
     # Mesmos números da coleta de ontem = não grava, tenta na próxima hora #
-def test_coletar_mundo_ignora_dados_repetidos(banco_teste, monkeypatch):
+def test_coletar_mundo_ignora_dados_repetidos(conexao, monkeypatch):
 
-    preparar_coleta(monkeypatch, lambda mundo: dados_falsos(5))
+    preparar_coleta(conexao, monkeypatch, lambda mundo: dados_falsos(5))
 
     ontem = {
         "mundo": "Kalibra",
@@ -159,19 +159,19 @@ def test_coletar_mundo_ignora_dados_repetidos(banco_teste, monkeypatch):
         "kills_24h_total": 5,
         "kills_7d_total": 5
     }
-    banco.salvar_coleta(ontem, [])
+    banco.salvar_coleta(conexao, ontem, [])
 
-    gravou = coletor.coletar_mundo("Kalibra", "Europe", date(2026, 11, 1), agora)
+    gravou = coletor.coletar_mundo(conexao, "Kalibra", "Europe", date(2026, 11, 1), agora)
 
     assert gravou is False
-    assert banco.mundos_coletados(date(2026, 11, 1)) == set()
+    assert banco.mundos_coletados(conexao, date(2026, 11, 1)) == set()
 
     # TESTE : API FORA DO AR #
     # Sem resposta da API = não grava e não dá erro #
-def test_coletar_mundo_api_fora_do_ar(banco_teste, monkeypatch):
+def test_coletar_mundo_api_fora_do_ar(conexao, monkeypatch):
 
-    preparar_coleta(monkeypatch, lambda mundo: None)
+    preparar_coleta(conexao, monkeypatch, lambda mundo: None)
 
-    gravou = coletor.coletar_mundo("Kalibra", "Europe", date(2026, 11, 1), agora)
+    gravou = coletor.coletar_mundo(conexao, "Kalibra", "Europe", date(2026, 11, 1), agora)
 
     assert gravou is False
