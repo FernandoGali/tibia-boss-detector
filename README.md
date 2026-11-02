@@ -98,7 +98,13 @@ Register-ScheduledTask -TaskName "Tibia Sentinela" -Action $acao -Trigger $gatil
 python -m pytest
 ```
 
-Os testes não usam a API de verdade nem o banco.
+Os testes não usam a API de verdade. Os que mexem no banco usam um banco separado, o `boss_detector_teste`, que é apagado a cada teste. Para criar (conectado como `postgres`):
+
+```sql
+CREATE DATABASE boss_detector_teste OWNER boss_detector;
+```
+
+Ele usa o mesmo usuário e senha do `.env`, então não precisa configurar mais nada. Sem esse banco, esses testes são pulados.
 
 ## Próximos passos
 

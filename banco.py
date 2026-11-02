@@ -224,6 +224,71 @@ def salvar_coleta(coleta, registros):
             ))
 
 
+    # SITE #
+
+    # FUNÇÃO : LISTAR MUNDOS #
+    # Os mundos que já têm coleta, com a região, em ordem alfabética #
+def listar_mundos():
+
+    comando = """
+        SELECT DISTINCT mundo, regiao
+        FROM coletas
+        ORDER BY mundo
+    """
+
+    with conectar() as conexao:
+        return conexao.execute(comando).fetchall()
+
+    # FUNÇÃO : CONSULTAR SEMÁFORO #
+    # A mesma consulta do consulta_semaforo.sql, agora com o mundo, as criaturas #
+    # e a data de hoje vindo de fora (%(nome)s), mais as últimas 3 aparições #
+def consultar_semaforo(mundo, criaturas, hoje):
+
+    comando = """
+        WITH resumo AS (
+            SELECT criatura,
+                   COUNT(*) FILTER (WHERE kills_24h > 0) AS aparicoes,
+                   MIN(data_atividade) FILTER (WHERE kills_24h > 0) AS primeira_aparicao,
+                   MAX(data_atividade) FILTER (WHERE kills_24h > 0) AS ultima_aparicao,
+                   (ARRAY_AGG(data_atividade ORDER BY data_atividade DESC)
+                        FILTER (WHERE kills_24h > 0))[1:3] AS ultimas_aparicoes
+            FROM snapshots
+            WHERE mundo = %(mundo)s
+              AND criatura = ANY(%(criaturas)s)
+            GROUP BY criatura
+        ),
+        previsao AS (
+            SELECT *,
+                   (ultima_aparicao - primeira_aparicao) / NULLIF(aparicoes - 1.0, 0) AS intervalo_medio
+            FROM resumo
+        )
+        SELECT criatura,
+               aparicoes,
+               ultima_aparicao,
+               COALESCE(ultimas_aparicoes, ARRAY[]::date[]) AS ultimas_aparicoes,
+               ROUND(intervalo_medio, 1) AS intervalo_medio,
+               ultima_aparicao + ROUND(intervalo_medio)::int AS proxima_prevista,
+               %(hoje)s - ultima_aparicao AS dias_sem_aparecer,
+               CASE
+                   WHEN aparicoes < 2 THEN NULL
+                   WHEN %(hoje)s - ultima_aparicao >= intervalo_medio THEN 'alta'
+                   WHEN %(hoje)s - ultima_aparicao >= intervalo_medio / 2 THEN 'média'
+                   ELSE 'baixa'
+               END AS semaforo,
+               CASE
+                   WHEN aparicoes = 0 THEN 'Ainda sem histórico de atividade'
+                   WHEN aparicoes = 1 THEN 'Histórico ainda é insuficiente para previsão'
+               END AS mensagem
+        FROM previsao
+        ORDER BY aparicoes DESC, criatura
+    """
+
+    parametros = {"mundo": mundo, "criaturas": criaturas, "hoje": hoje}
+
+    with conectar() as conexao:
+        return conexao.execute(comando, parametros).fetchall()
+
+
 if __name__ == "__main__":
     criar_tabelas()
     print("Tabelas criadas (ou já existiam).")
