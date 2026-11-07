@@ -17,7 +17,7 @@ Um script roda de hora em hora e faz duas coisas:
 1. Consulta alguns mundos "sentinela" pra saber se as kill statistics já foram atualizadas
 2. Se atualizaram, coleta as criaturas raras de todos os mundos e salva no banco
 
-As kill statistics atualizam uma vez por dia, de madrugada no horário de Berlim (na primeira noite que acompanhei foi entre 03:00 e 04:00, todas as regiões juntas). A atualização do dia D traz as mortes do dia D-1, então é essa a data que fica salva. Todas as datas do projeto usam o horário de Berlim, que é o horário do Tibia.
+As kill statistics atualizam uma vez por dia, de madrugada no horário de Berlim (acompanhei vários dias e foi sempre entre 03:00 e 04:00, todas as regiões juntas). A atualização do dia D traz as mortes do dia D-1, então é essa a data que fica salva. Todas as datas do projeto usam o horário de Berlim, que é o horário do Tibia.
 
 Sentinelas são os mundos mais cheios de cada região: 2 da Europa, 2 da América do Norte, 2 da América do Sul e 1 da Oceania (que só tem 3 mundos). Se a soma das kills de uma sentinela mudou de uma hora pra outra, é porque atualizou.
 
@@ -43,7 +43,8 @@ Precisa de Python 3.13+ e PostgreSQL.
 git clone https://github.com/FernandoGali/tibia-boss-detector.git
 cd tibia-boss-detector
 python -m venv .venv
-.venv\Scripts\activate
+source .venv/bin/activate      # Linux
+# .venv\Scripts\activate       # Windows
 pip install -r requirements.txt
 ```
 
@@ -85,6 +86,48 @@ python main.py
 
 O que acontece em cada execução fica salvo no `boss_detector.log`.
 
+### De hora em hora no Linux
+
+Uso um timer do systemd no usuário. Cria os dois arquivos em `~/.config/systemd/user/`:
+
+`boss-detector.service`
+
+```ini
+[Unit]
+Description=Boss Detector - coleta
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/caminho/do/projeto
+ExecStart=/caminho/do/projeto/.venv/bin/python main.py
+```
+
+`boss-detector.timer`
+
+```ini
+[Unit]
+Description=Boss Detector - de hora em hora no minuto 05
+
+[Timer]
+OnCalendar=*-*-* *:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+E liga o timer:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now boss-detector.timer
+```
+
+O `Persistent=true` faz ele rodar assim que o computador ligar se perdeu algum horário. Pra conferir: `systemctl --user list-timers`.
+
+### De hora em hora no Windows
+
 Pra rodar de hora em hora no Windows, eu uso o Agendador de Tarefas com o `pythonw.exe` (que roda sem abrir janela). No PowerShell:
 
 ```powershell
@@ -97,6 +140,18 @@ $opcoes  = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatte
 
 Register-ScheduledTask -TaskName "Tibia Sentinela" -Action $acao -Trigger $gatilho -Settings $opcoes
 ```
+
+### API
+
+```bash
+fastapi dev api.py
+```
+
+Sobe em `http://127.0.0.1:8000`. A documentação com todos os endereços fica em `http://127.0.0.1:8000/docs`.
+
+- `/mundos` - lista de mundos
+- `/criaturas` - lista de criaturas raras
+- `/consulta?mundo=Kalibra&criaturas=Yakchal` - semáforo de cada criatura no mundo (sem `criaturas`, devolve todas)
 
 ## Testes
 
@@ -114,6 +169,7 @@ Ele usa o mesmo usuário e senha do `.env`, então não precisa configurar mais 
 
 ## Próximos passos
 
-- [ ] Acompanhar mais alguns dias pra confirmar o horário da atualização
+- [x] Acompanhar mais alguns dias pra confirmar o horário da atualização
+- [x] Criar a API
+- [ ] Criar o site
 - [ ] Colocar pra rodar num servidor
-- [ ] Criar a API e o site
