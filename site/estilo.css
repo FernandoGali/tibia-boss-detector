@@ -1,12 +1,18 @@
 /* CORES */
-/* Tema escuro azulado (não preto), com dourado de destaque */
+/* Tema escuro azulado (não preto): título prata, botões grafite e destaques em azul */
 :root {
     --fundo: #1c212b;
     --painel: #262d3a;
     --painel-borda: #364052;
     --texto: #e6e1d6;
     --texto-fraco: #a3a9b5;
-    --dourado: #d8ae5e;
+
+    --titulo: #d9dee6;
+    --destaque: #7fa7d9;
+    --checkbox: #3f63a8;
+    --botao: #263a4f;
+    --botao-borda: #5b8fd6;
+    --botao-texto: #e6eaf0;
 
     /* Semáforo: cores das runas (fogo, thunderstorm, gelo) */
     --alta: #f08a3c;
@@ -70,7 +76,7 @@ body::before {
 
 h1 {
     margin: 0;
-    color: var(--dourado);
+    color: var(--titulo);
     font-size: 1.8rem;
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -84,15 +90,19 @@ h1 {
     gap: 10px;
 }
 
+/* Só transform e opacity são animados: o navegador faz isso na placa de vídeo, sem travar */
+/* O brilho em volta (drop-shadow) é fixo, não animado */
 .runa-titulo {
     width: 44px;
     height: 44px;
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.18));
+    will-change: transform, opacity;
     animation: pulsar-runa 3s ease-in-out infinite;
 }
 
 @keyframes pulsar-runa {
-    0%, 100% { filter: brightness(1); transform: scale(1); }
-    50% { filter: brightness(1.3) drop-shadow(0 0 6px rgba(255, 255, 255, 0.25)); transform: scale(1.06); }
+    0%, 100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.08); opacity: 1; }
 }
 
 .subtitulo {
@@ -105,19 +115,22 @@ h1 {
     gap: 4px;
 }
 
+/* Mesmas cores dos botões; o inativo fica com borda e texto apagados */
 .idiomas button {
     padding: 4px 10px;
-    border: 1px solid var(--painel-borda);
+    border: 1px solid color-mix(in srgb, var(--botao-borda) 45%, transparent);
     border-radius: 6px;
-    background: var(--painel);
+    background: var(--botao);
     color: var(--texto-fraco);
     font-weight: 600;
     cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.idiomas button.ativo {
-    border-color: var(--dourado);
-    color: var(--dourado);
+.idiomas button.ativo,
+.idiomas button:hover {
+    border-color: var(--botao-borda);
+    color: var(--botao-texto);
 }
 
 main {
@@ -192,26 +205,69 @@ select {
     font-size: 0.9rem;
     white-space: nowrap;
     cursor: pointer;
+    /* padding + margin negativa: o fundo do hover sobra um pouco sem desalinhar a lista */
+    padding: 1px 6px;
+    margin: 0 -6px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
+.lista-criaturas label:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--destaque);
+}
+
+/* Azul mais escuro que o destaque, para o marcado se diferenciar bem do desmarcado (branco) */
 .lista-criaturas input {
-    accent-color: var(--dourado);
+    accent-color: var(--checkbox);
 }
 
 /* BOTÃO */
 /* Serve para <button> e para <a> (o "Nova consulta" é um link) */
+/* Azul petróleo com borda azul; position + overflow seguram o reflexo do hover dentro do botão */
 .botao {
+    position: relative;
+    overflow: hidden;
     justify-self: start;
     display: inline-block;
     padding: 10px 28px;
-    border: 0;
+    border: 1px solid var(--botao-borda);
     border-radius: 6px;
-    background: var(--dourado);
-    color: #1c212b;
+    background: var(--botao);
+    color: var(--botao-texto);
     font-size: 1rem;
     font-weight: 700;
     text-decoration: none;
     cursor: pointer;
+}
+
+/* Hover: um reflexo de luz atravessa o botão, da esquerda para a direita */
+/* Vale também para os botões PT/EN */
+.idiomas button {
+    position: relative;
+    overflow: hidden;
+}
+
+.botao::after,
+.idiomas button::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+    transform: skewX(-20deg);
+    pointer-events: none;
+}
+
+.botao:hover::after,
+.idiomas button:hover::after {
+    animation: reflexo 0.7s ease;
+}
+
+@keyframes reflexo {
+    to { left: 130%; }
 }
 
 /* Botão com runa (Consultar com a Paralyze), centralizado */
@@ -350,6 +406,7 @@ select {
     border-left: 4px solid var(--cor-semaforo, var(--sem-dados));
     border-radius: 10px;
     background: color-mix(in srgb, var(--painel) 85%, transparent);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .card[data-semaforo="alta"] { --cor-semaforo: var(--alta); }
@@ -359,6 +416,16 @@ select {
 /* Brilho leve em volta, na cor da runa */
 .card[data-semaforo] {
     box-shadow: 0 0 14px -6px var(--cor-semaforo);
+}
+
+/* Hover: o card sobe um pouco, o brilho fica mais forte e a runa pulsa */
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 22px -6px var(--cor-semaforo, rgba(255, 255, 255, 0.25));
+}
+
+.card:hover .selo img {
+    animation: pulsar-runa 1.2s ease-in-out infinite;
 }
 
 /* TOPO DO CARD : GIF em cima, nome e selo centralizados embaixo */
