@@ -209,10 +209,3 @@ systemctl list-timers "boss-detector*"              # próximas coletas e backup
 tail -f ~/boss-detector/boss_detector.log           # log da coleta
 journalctl -u boss-detector-site -f                 # log do site
 ```
-
-## Próximos passos
-
-- [x] Acompanhar mais alguns dias pra confirmar o horário da atualização
-- [x] Criar a API
-- [x] Criar o site
-- [x] Colocar pra rodar num servidor
