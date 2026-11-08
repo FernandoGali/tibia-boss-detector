@@ -8,7 +8,7 @@ A ideia é simples: as kill statistics de cada mundo mostram quantas vezes cada 
 
 Os dados vêm da [API TibiaData](https://tibiadata.com/).
 
-Por enquanto o projeto só coleta e guarda os dados. O plano é ter um site onde a pessoa escolhe o mundo e vê o histórico.
+O projeto coleta e guarda os dados todo dia, e tem um site onde a pessoa escolhe o mundo e as criaturas e vê a chance de cada uma aparecer (alta, média ou baixa), com a última aparição e a próxima prevista. O site tem versão em português e em inglês.
 
 ## Como funciona
 
@@ -33,7 +33,8 @@ Se algum mundo falhar ou ainda estiver com os números do dia anterior, ele é c
 - `tempo.py` - fusos e horários do Tibia
 - `registro.py` - log
 - `banco.py` - tudo que mexe no PostgreSQL
-- `api.py` - API que o site vai usar
+- `api.py` - API que o site usa (e que também entrega o site)
+- `site/` - o site: página de seleção (`index.html`), página de resultado (`resultado.html`), estilo, script e imagens
 
 ## Instalação
 
@@ -141,13 +142,13 @@ $opcoes  = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatte
 Register-ScheduledTask -TaskName "Tibia Sentinela" -Action $acao -Trigger $gatilho -Settings $opcoes
 ```
 
-### API
+### Site e API
 
 ```bash
 fastapi dev api.py
 ```
 
-Sobe em `http://127.0.0.1:8000`. A documentação com todos os endereços fica em `http://127.0.0.1:8000/docs`.
+O site abre em `http://127.0.0.1:8000`. A API roda junto, no mesmo endereço, e a documentação com todos os endereços dela fica em `http://127.0.0.1:8000/docs`.
 
 - `/mundos` - lista de mundos
 - `/criaturas` - lista de criaturas raras
@@ -171,5 +172,5 @@ Ele usa o mesmo usuário e senha do `.env`, então não precisa configurar mais 
 
 - [x] Acompanhar mais alguns dias pra confirmar o horário da atualização
 - [x] Criar a API
-- [ ] Criar o site
+- [x] Criar o site
 - [ ] Colocar pra rodar num servidor
