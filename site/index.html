@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tibia Boss Detector</title>
+    <link rel="icon" href="imagens/favicon.png">
+    <link rel="stylesheet" href="estilo.css">
+    <script src="app.js" defer></script>
+</head>
+<body data-pagina="selecao">
+
+    <!-- CABEÇALHO -->
+    <header class="cabecalho">
+        <div>
+            <div class="titulo">
+                <img class="runa-titulo" src="imagens/runas/sd.webp" alt="">
+                <h1>Tibia Boss Detector</h1>
+                <img class="runa-titulo" src="imagens/runas/sd.webp" alt="">
+            </div>
+            <p class="subtitulo" data-texto="subtitulo"></p>
+        </div>
+        <div class="idiomas">
+            <button type="button" data-idioma="pt">PT</button>
+            <button type="button" data-idioma="en">EN</button>
+        </div>
+    </header>
+
+    <main>
+
+        <!-- FORMULÁRIO : MUNDO E CRIATURAS -->
+        <form id="formulario" class="painel">
+
+            <label class="campo campo-mundo">
+                <span data-texto="mundo"></span>
+                <select id="mundo" required></select>
+            </label>
+
+            <fieldset class="campo">
+                <legend data-texto="criaturas"></legend>
+                <p class="dica" data-texto="dica_criaturas"></p>
+                <div id="lista-criaturas" class="lista-criaturas"></div>
+            </fieldset>
+
+            <button type="submit" class="botao botao-runa">
+                <img src="imagens/runas/paralyze.webp" alt="">
+                <span data-texto="consultar"></span>
+            </button>
+
+            <!-- LEGENDA DO SEMÁFORO -->
+            <div class="legenda">
+                <span><img src="imagens/runas/fogo.webp" alt=""><span data-texto="alta"></span></span>
+                <span><img src="imagens/runas/thunderstorm.webp" alt=""><span data-texto="media"></span></span>
+                <span><img src="imagens/runas/gelo.webp" alt=""><span data-texto="baixa"></span></span>
+            </div>
+        </form>
+
+        <p id="aviso" class="aviso"></p>
+
+    </main>
+
+</body>
+</html>

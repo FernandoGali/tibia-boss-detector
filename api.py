@@ -1,7 +1,9 @@
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
 
 import banco
 from criaturas import criaturas_raras
@@ -63,13 +65,6 @@ def mundos_em_cache():
 
     # ENDEREÇOS #
 
-    # ENDEREÇO : INÍCIO #
-    # Só para testar se a API está no ar #
-@app.get("/")
-def inicio():
-
-    return {"mensagem": "API do Tibia Boss Detector funcionando"}
-
     # ENDEREÇO : MUNDOS #
     # Lista de mundos para o seletor da tela inicial #
 @app.get("/mundos")
@@ -113,3 +108,10 @@ def consulta(mundo: str, criaturas: list[str] = Query(default=[])):
         "data_consulta": hoje,
         "criaturas": resultado
     }
+
+
+    # SITE #
+    # Os arquivos da pasta site/ (páginas, estilo, script e imagens) #
+    # Fica por último: as rotas da API acima têm prioridade, e o resto vai para o site #
+    # html=True faz o endereço principal ("/") abrir o index.html #
+app.mount("/", StaticFiles(directory=Path(__file__).parent / "site", html=True), name="site")

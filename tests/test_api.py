@@ -113,3 +113,18 @@ def test_criaturas_em_ordem_alfabetica():
 
     assert len(resposta) == len(criaturas_raras)
     assert resposta == sorted(resposta)
+
+
+    # TESTE : SITE NO ENDEREÇO PRINCIPAL #
+    # "/" tem que abrir a página de seleção (HTML) e a API tem que continuar respondendo JSON #
+def test_endereco_principal_abre_o_site():
+
+    site = cliente.get("/")
+    mundos = cliente.get("/mundos")
+
+    assert site.status_code == 200
+    assert "text/html" in site.headers["content-type"]
+    assert 'data-pagina="selecao"' in site.text
+
+    assert mundos.status_code == 200
+    assert mundos.json()[0]["mundo"] == "Antica"

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tibia Boss Detector</title>
+    <link rel="icon" href="imagens/favicon.png">
+    <link rel="stylesheet" href="estilo.css">
+    <script src="app.js" defer></script>
+</head>
+<body data-pagina="resultado">
+
+    <!-- CABEÇALHO -->
+    <header class="cabecalho">
+        <div>
+            <div class="titulo">
+                <img class="runa-titulo" src="imagens/runas/sd.webp" alt="">
+                <h1>Tibia Boss Detector</h1>
+                <img class="runa-titulo" src="imagens/runas/sd.webp" alt="">
+            </div>
+            <p class="subtitulo" data-texto="subtitulo"></p>
+        </div>
+        <div class="idiomas">
+            <button type="button" data-idioma="pt">PT</button>
+            <button type="button" data-idioma="en">EN</button>
+        </div>
+    </header>
+
+    <main>
+
+        <!-- RESUMO E NOVA CONSULTA -->
+        <div class="barra-resultado">
+            <p id="aviso" class="aviso"></p>
+            <a href="index.html" class="botao" data-texto="nova_consulta"></a>
+        </div>
+
+        <!-- CARREGANDO : as 3 runas acendendo em sequência -->
+        <div id="carregando" class="carregando" role="status" hidden>
+            <img src="imagens/runas/fogo.webp" alt="">
+            <img src="imagens/runas/thunderstorm.webp" alt="">
+            <img src="imagens/runas/gelo.webp" alt="">
+        </div>
+
+        <!-- CARDS -->
+        <div id="cards" class="cards"></div>
+
+    </main>
+
+</body>
+</html>
