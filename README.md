@@ -10,6 +10,8 @@ Os dados vêm da [API TibiaData](https://tibiadata.com/).
 
 O projeto coleta e guarda os dados todo dia, e tem um site onde a pessoa escolhe o mundo e as criaturas e vê a chance de cada uma aparecer (alta, média ou baixa), com a última aparição e a próxima prevista. O site tem versão em português e em inglês.
 
+O site está no ar em **https://bossdetector.duckdns.org**.
+
 ## Como funciona
 
 Um script roda de hora em hora e faz duas coisas:
@@ -168,9 +170,49 @@ CREATE DATABASE boss_detector_teste OWNER boss_detector;
 
 Ele usa o mesmo usuário e senha do `.env`, então não precisa configurar mais nada. Sem esse banco, esses testes são pulados.
 
+## Servidor
+
+O site roda numa VM grátis do Google Cloud (e2-micro, Ubuntu 26.04), com tudo na mesma máquina:
+
+- **PostgreSQL** - acessível só de dentro do servidor
+- **Site e API** - `uvicorn` ouvindo só em `127.0.0.1:8000`
+- **Caddy** - recebe as visitas e cuida do HTTPS (certificado do Let's Encrypt, renovado sozinho)
+- **Domínio** - subdomínio grátis do [DuckDNS](https://www.duckdns.org) apontando para o IP da VM
+
+O projeto fica em `~/boss-detector` e roda com estes serviços do systemd:
+
+| Serviço | O que faz |
+|---|---|
+| `boss-detector-site.service` | Site e API, sempre ligado (reinicia sozinho se cair) |
+| `boss-detector.timer` | Coleta de hora em hora, no minuto 05 |
+| `boss-detector-backup.timer` | Backup do banco todo dia às 05:30, guardando os últimos 7 dias em `~/backups` |
+
+### Atualizar o servidor
+
+Depois de mandar as mudanças para o GitHub:
+
+```bash
+ssh usuario@servidor
+cd ~/boss-detector
+git pull
+.venv/bin/pip install -r requirements.txt   # só se o requirements.txt mudou
+sudo systemctl restart boss-detector-site
+```
+
+A coleta não precisa reiniciar: o timer roda o `main.py` atualizado na próxima hora.
+
+### Ver o que está acontecendo
+
+```bash
+systemctl status boss-detector-site                 # site e API
+systemctl list-timers "boss-detector*"              # próximas coletas e backups
+tail -f ~/boss-detector/boss_detector.log           # log da coleta
+journalctl -u boss-detector-site -f                 # log do site
+```
+
 ## Próximos passos
 
 - [x] Acompanhar mais alguns dias pra confirmar o horário da atualização
 - [x] Criar a API
 - [x] Criar o site
-- [ ] Colocar pra rodar num servidor
+- [x] Colocar pra rodar num servidor
