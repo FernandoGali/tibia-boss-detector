@@ -90,19 +90,20 @@ h1 {
     gap: 10px;
 }
 
-/* Só transform e opacity são animados: o navegador faz isso na placa de vídeo, sem travar */
-/* O brilho em volta (drop-shadow) é fixo, não animado */
+/* Só o tamanho é animado (transform), que o navegador faz na placa de vídeo */
+/* Sem filter na imagem animada: ele obrigaria a redesenhar a runa a cada quadro (a runa já tem brilho no desenho) */
+/* translateZ(0) + backface-visibility: movimento com precisão de subpixel, sem "saltos" */
+/* Curva suave (cubic-bezier) e ciclo mais longo para a pulsação ficar fluida */
 .runa-titulo {
     width: 44px;
     height: 44px;
-    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.18));
-    will-change: transform, opacity;
-    animation: pulsar-runa 3s ease-in-out infinite;
+    backface-visibility: hidden;
+    animation: pulsar-runa 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
 @keyframes pulsar-runa {
-    0%, 100% { transform: scale(1); opacity: 0.85; }
-    50% { transform: scale(1.08); opacity: 1; }
+    0%, 100% { transform: translateZ(0) scale(1); }
+    50% { transform: translateZ(0) scale(1.06); }
 }
 
 .subtitulo {
@@ -116,7 +117,10 @@ h1 {
 }
 
 /* Mesmas cores dos botões; o inativo fica com borda e texto apagados */
+/* position + overflow seguram o reflexo do hover dentro do botão */
 .idiomas button {
+    position: relative;
+    overflow: hidden;
     padding: 4px 10px;
     border: 1px solid color-mix(in srgb, var(--botao-borda) 45%, transparent);
     border-radius: 6px;
@@ -127,9 +131,10 @@ h1 {
     transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.idiomas button.ativo,
-.idiomas button:hover {
+/* Ativo: borda cheia, texto claro e fundo um pouco mais azul (diferente do hover) */
+.idiomas button.ativo {
     border-color: var(--botao-borda);
+    background: color-mix(in srgb, var(--botao-borda) 25%, var(--botao));
     color: var(--botao-texto);
 }
 
@@ -194,7 +199,7 @@ select {
 .lista-criaturas {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
-    gap: 4px 10px;
+    gap: 4px 12px;
 }
 
 .lista-criaturas label {
@@ -206,15 +211,11 @@ select {
     white-space: nowrap;
     cursor: pointer;
     /* padding + margin negativa: o fundo do hover sobra um pouco sem desalinhar a lista */
-    padding: 1px 6px;
-    margin: 0 -6px;
+    /* 4px de cada lado < metade do gap (12px), então um label nunca invade o vizinho */
+    padding: 1px 4px;
+    margin: 0 -4px;
     border-radius: 4px;
     transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.lista-criaturas label:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--destaque);
 }
 
 /* Azul mais escuro que o destaque, para o marcado se diferenciar bem do desmarcado (branco) */
@@ -241,33 +242,25 @@ select {
     cursor: pointer;
 }
 
-/* Hover: um reflexo de luz atravessa o botão, da esquerda para a direita */
-/* Vale também para os botões PT/EN */
-.idiomas button {
-    position: relative;
-    overflow: hidden;
-}
-
+/* REFLEXO DO HOVER : uma faixa de luz atravessa o botão (também nos botões PT/EN) */
+/* A faixa fica parada fora do botão, à esquerda; no hover, só o transform anda (sem recalcular layout) */
+/* translateX em % da própria faixa (40% do botão): -150% = fora à esquerda, 330% = fora à direita */
 .botao::after,
 .idiomas button::after {
     content: "";
     position: absolute;
     top: 0;
-    left: -60%;
+    left: 0;
     width: 40%;
     height: 100%;
     background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.22), transparent);
-    transform: skewX(-20deg);
+    transform: translateX(-150%) skewX(-20deg);
     pointer-events: none;
 }
 
-.botao:hover::after,
-.idiomas button:hover::after {
-    animation: reflexo 0.7s ease;
-}
-
 @keyframes reflexo {
-    to { left: 130%; }
+    from { transform: translateX(-150%) skewX(-20deg); }
+    to { transform: translateX(330%) skewX(-20deg); }
 }
 
 /* Botão com runa (Consultar com a Paralyze), centralizado */
@@ -398,6 +391,7 @@ select {
 }
 
 .card {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -406,7 +400,20 @@ select {
     border-left: 4px solid var(--cor-semaforo, var(--sem-dados));
     border-radius: 10px;
     background: color-mix(in srgb, var(--painel) 85%, transparent);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease;
+}
+
+/* Brilho forte do hover numa camada própria, já desenhada: no hover só a opacidade muda */
+/* (animar box-shadow direto obrigaria a redesenhar a sombra a cada quadro) */
+.card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 6px 22px -6px var(--cor-semaforo, rgba(255, 255, 255, 0.25));
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
 }
 
 .card[data-semaforo="alta"] { --cor-semaforo: var(--alta); }
@@ -416,16 +423,6 @@ select {
 /* Brilho leve em volta, na cor da runa */
 .card[data-semaforo] {
     box-shadow: 0 0 14px -6px var(--cor-semaforo);
-}
-
-/* Hover: o card sobe um pouco, o brilho fica mais forte e a runa pulsa */
-.card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 22px -6px var(--cor-semaforo, rgba(255, 255, 255, 0.25));
-}
-
-.card:hover .selo img {
-    animation: pulsar-runa 1.2s ease-in-out infinite;
 }
 
 /* TOPO DO CARD : GIF em cima, nome e selo centralizados embaixo */
@@ -532,5 +529,57 @@ select {
     .botao {
         justify-self: stretch;
         text-align: center;
+    }
+}
+
+/* HOVERS */
+/* Só em aparelhos com mouse: no celular o hover "gruda" depois do toque */
+@media (hover: hover) {
+
+    /* Botões: o reflexo de luz atravessa */
+    .botao:hover::after,
+    .idiomas button:hover::after {
+        animation: reflexo 0.7s ease;
+    }
+
+    /* PT/EN inativo: acende um pouco, mas sem ficar igual ao ativo */
+    .idiomas button:not(.ativo):hover {
+        border-color: color-mix(in srgb, var(--botao-borda) 75%, transparent);
+        color: var(--texto);
+    }
+
+    /* Lista de criaturas: fundo leve e nome em azul */
+    .lista-criaturas label:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--destaque);
+    }
+
+    /* Cards: sobem um pouco, o brilho forte aparece e a runa pulsa (só no tamanho, sem apagar) */
+    .card:hover {
+        transform: translateY(-3px);
+    }
+
+    .card:hover::after {
+        opacity: 1;
+    }
+
+    .card:hover .selo img {
+        animation: pulsar-runa 1.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    }
+}
+
+/* MOVIMENTO REDUZIDO */
+/* Para quem ativou "reduzir movimento" no sistema: sem animações, sem transições e sem o card subir */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    .card:hover {
+        transform: none;
     }
 }
