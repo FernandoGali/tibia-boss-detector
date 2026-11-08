@@ -11,7 +11,7 @@ from ajudantes import dados_falsos
     # TESTES #
 
     # TESTE : CRIAR REGISTROS COM CRIATURAS AUSENTES #
-    # A API devolve só o Yeti. O registro tem que ter o Yeti com as kills certas #
+    # A API devolve só o Yeti (que lá se chama "yetis"). O registro tem que ter o Yeti com as kills certas #
     # e a Midnight Panther com 0 kills e marcada como não encontrada na API #
     # Os dois registros guardam o timestamp que veio da API #
 def test_criar_registros_inclui_criaturas_ausentes():
@@ -23,7 +23,7 @@ def test_criar_registros_inclui_criaturas_ausentes():
         "killstatistics": {
             "entries": [
                 {
-                    "race": "Yeti",
+                    "race": "yetis",
                     "last_day_killed": 2,
                     "last_week_killed": 5
                 }
@@ -56,6 +56,40 @@ def test_criar_registros_inclui_criaturas_ausentes():
 
     assert yeti["timestamp_api"] == "2026-10-15T09:00:00Z"
     assert pantera["timestamp_api"] == "2026-10-15T09:00:00Z"
+
+
+    # TESTE : NOMES DIFERENTES NA API #
+    # Criatura comum vem no plural e em minúsculas ("dire penguins") #
+    # Boss vem com maiúsculas diferentes ("Man in the Cave") #
+    # As duas têm que ser encontradas e gravadas com o nome da nossa lista #
+def test_criar_registros_acha_nomes_diferentes_na_api():
+
+    dados = {
+        "killstatistics": {
+            "entries": [
+                {"race": "dire penguins", "last_day_killed": 3, "last_week_killed": 9},
+                {"race": "Man in the Cave", "last_day_killed": 1, "last_week_killed": 1}
+            ]
+        }
+    }
+
+    registros = criar_registros(
+        dados,
+        ["Dire Penguin", "Man In The Cave"],
+        "2026-10-14",
+        "2026-10-15",
+        "Kalibra"
+    )
+
+    pinguim = next(r for r in registros if r["criatura"] == "Dire Penguin")
+    homem = next(r for r in registros if r["criatura"] == "Man In The Cave")
+
+    assert pinguim["encontrada_na_api"] is True
+    assert pinguim["kills_24h"] == 3
+    assert pinguim["kills_7d"] == 9
+
+    assert homem["encontrada_na_api"] is True
+    assert homem["kills_24h"] == 1
 
 
     # TESTE : DADOS REPETIDOS #

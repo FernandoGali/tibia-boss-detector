@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 import api
 import banco
 from api import app
+from criaturas import criaturas_raras
 
     # CLIENTE DE TESTE #
     # Faz pedidos para a API sem precisar ligar o servidor #
@@ -69,7 +70,7 @@ def test_consulta_sem_criaturas_busca_todas(monkeypatch):
     resposta = cliente.get("/consulta", params={"mundo": "Kalibra"})
 
     assert resposta.status_code == 200
-    assert len(pedidos[0]) == 29
+    assert len(pedidos[0]) == len(criaturas_raras)
 
 
     # TESTE : CONSULTA SEM MUNDO #
@@ -110,5 +111,5 @@ def test_criaturas_em_ordem_alfabetica():
 
     resposta = cliente.get("/criaturas").json()
 
-    assert len(resposta) == 29
+    assert len(resposta) == len(criaturas_raras)
     assert resposta == sorted(resposta)

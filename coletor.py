@@ -2,7 +2,7 @@ import logging
 import time
 
 import banco
-from criaturas import criaturas_raras
+from criaturas import criaturas_raras, nomes_na_api
 from registro import registrar
 from sentinela import verificar_mudanca
 from tempo import data_atividade
@@ -22,13 +22,15 @@ def criar_registros(dados, criaturas_raras, data_atividade, data_coleta, mundo):
     timestamp_api = dados.get("information", {}).get("timestamp")
 
     # Dicionário nome -> dados da criatura, para achar cada uma sem percorrer a lista toda #
-    na_api = {criatura["race"]: criatura for criatura in dados["killstatistics"]["entries"]}
+    # Nome em minúsculas, porque a API não segue um padrão (ex.: "Arthom The Hunter") #
+    na_api = {criatura["race"].lower(): criatura for criatura in dados["killstatistics"]["entries"]}
 
     registros = []
 
     for nome in criaturas_raras:
 
-        criatura = na_api.get(nome)
+        # Criaturas comuns têm outro nome na API (ex.: "Yeti" -> "yetis") #
+        criatura = na_api.get(nomes_na_api.get(nome, nome).lower())
 
         registros.append({
             "data": data_atividade,
