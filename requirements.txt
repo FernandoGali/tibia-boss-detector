@@ -1,6 +1,6 @@
 requests==2.34.2
 tzdata==2026.6
-psycopg[binary]==3.3.6
+psycopg[binary]==3.3.8
 psycopg-pool==3.3.3
 python-dotenv==1.2.4
 fastapi[standard]==0.162.0
