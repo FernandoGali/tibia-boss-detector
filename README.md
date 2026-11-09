@@ -38,6 +38,24 @@ Se algum mundo falhar ou ainda estiver com os números do dia anterior, ele é c
 - `api.py` - API que o site usa (e que também entrega o site)
 - `site/` - o site: página de seleção (`index.html`), página de resultado (`resultado.html`), estilo, script e imagens
 
+### Previsão
+
+Para cada criatura, o projeto mede os **intervalos**: quantos dias se passaram entre duas aparições seguidas no mesmo mundo. Como a regra de nascimento de uma criatura é a mesma em todos os mundos, os intervalos de todos os mundos são juntados, e o **intervalo típico** é a mediana deles.
+
+Em cada mundo, a chance compara esse intervalo com os dias desde a última aparição naquele mundo: passou do intervalo, a chance é **alta**; passou da metade, **média**; antes disso, **baixa**. A previsão só aparece a partir de 4 intervalos. Abaixo disso, o site mostra quantos faltam.
+
+## Limitações
+
+A previsão é uma estimativa a partir de dados públicos, não uma regra do jogo. Vale saber de onde ela pode errar:
+
+- **O que se mede é a morte, não o nascimento.** As kill statistics só registram criaturas mortas. Um boss que nasce e ninguém mata não aparece, e o intervalo registrado fica maior do que o real. Um boss morto dias depois de nascer conta no dia da morte. A mediana diminui o efeito desses casos, mas não elimina.
+- **A regra de nascimento não é oficial.** A CipSoft não divulga como os bosses nascem. Juntar os mundos parte da ideia de que a regra é a mesma em todos, o que é a suposição mais aceita pela comunidade, mas não é garantida.
+- **Só existe o dia, não a hora.** As kill statistics são diárias e chegam com um dia de atraso (a atualização do dia D traz o dia D-1). Não dá para saber em que horário a criatura apareceu, e o dia de hoje só entra amanhã.
+- **Dia perdido não volta.** A API só mostra o último dia. Se a coleta falhar o dia inteiro (API fora do ar, servidor desligado), aquele dia fica sem dados, e um intervalo pode parecer maior do que foi.
+- **Eventos e quests distorcem.** Se uma criatura aparece por evento, quest ou invocação, as mortes entram na mesma conta que os nascimentos normais.
+- **Pouco histórico no começo.** Com poucos dias coletados, a maioria das criaturas fica sem previsão até juntar 4 intervalos. Criaturas muito raras podem levar meses.
+- **Depende do TibiaData.** Os dados vêm de uma API mantida pela comunidade, que pode mudar ou sair do ar.
+
 ## Instalação
 
 Precisa de Python 3.13+ e PostgreSQL.

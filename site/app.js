@@ -15,13 +15,14 @@ const textos = {
         media: "Chance média",
         baixa: "Chance baixa",
         sem_previsao: "Sem previsão",
-        sem_historico: "Ainda sem histórico de atividade",
-        historico_insuficiente: "Histórico ainda é insuficiente para previsão",
+        poucos_dados: (intervalos, minimo) => `Ainda poucos dados: ${intervalos} de ${minimo} intervalos`,
+        nao_apareceu: "Ainda não apareceu neste mundo",
         ultima_aparicao: "Última aparição",
         proxima_prevista: "Próxima prevista",
-        aparicoes: "Aparições",
+        base_previsao: "Base da previsão",
+        base: (aparicoes, mundos) => `${aparicoes} ${aparicoes === 1 ? "aparição" : "aparições"} em ${mundos} ${mundos === 1 ? "mundo" : "mundos"}`,
         dias_atras: (dias) => dias === 0 ? "hoje" : dias === 1 ? "há 1 dia" : `há ${dias} dias`,
-        intervalo: (dias) => `intervalo médio de ${dias} dias`,
+        intervalo: (dias) => `intervalo típico de ${dias.toLocaleString("pt-BR")} ${dias === 1 ? "dia" : "dias"}`,
         regioes: { "Europe": "Europa", "North America": "América do Norte", "South America": "América do Sul", "Oceania": "Oceania" }
     },
     en: {
@@ -38,13 +39,14 @@ const textos = {
         media: "Medium chance",
         baixa: "Low chance",
         sem_previsao: "No prediction",
-        sem_historico: "No activity history yet",
-        historico_insuficiente: "Not enough history for a prediction yet",
+        poucos_dados: (intervalos, minimo) => `Not enough data yet: ${intervalos} of ${minimo} intervals`,
+        nao_apareceu: "Not seen on this world yet",
         ultima_aparicao: "Last seen",
         proxima_prevista: "Next expected",
-        aparicoes: "Appearances",
+        base_previsao: "Prediction based on",
+        base: (aparicoes, mundos) => `${aparicoes} ${aparicoes === 1 ? "appearance" : "appearances"} on ${mundos} ${mundos === 1 ? "world" : "worlds"}`,
         dias_atras: (dias) => dias === 0 ? "today" : dias === 1 ? "1 day ago" : `${dias} days ago`,
-        intervalo: (dias) => `average interval of ${dias} days`,
+        intervalo: (dias) => `typical interval of ${dias.toLocaleString("en-US")} ${dias === 1 ? "day" : "days"}`,
         regioes: { "Europe": "Europe", "North America": "North America", "South America": "South America", "Oceania": "Oceania" }
     }
 };
@@ -52,6 +54,10 @@ const textos = {
     // SEMÁFORO //
     // A API devolve "alta", "média" ou "baixa"; aqui vira a chave do texto //
 const chave_semaforo = { "alta": "alta", "média": "media", "baixa": "baixa" };
+
+    // MÍNIMO DE INTERVALOS //
+    // A API manda o mínimo em cada criatura; este é só para criaturas que nem vieram na resposta //
+const minimo_padrao = 4;
 
     // RUNAS DO SEMÁFORO //
     // Fogo = alta, Thunderstorm = média, Gelo = baixa. Sem previsão fica sem runa //
@@ -309,29 +315,46 @@ function criar_card(dados) {
     card.append(topo);
 
     const ultima = () => `${formatar_data(dados.ultima_aparicao)} · ${t("dias_atras")(dados.dias_sem_aparecer)}`;
+    const base = [t("base_previsao"), t("base")(dados.aparicoes_total ?? 0, dados.mundos_com_aparicao ?? 0)];
 
-    // Sem histórico (0 ou 1 aparição): a mensagem e, se tiver, a última aparição //
-    if (dados.aparicoes < 2) {
+    // Abaixo do mínimo de intervalos: mostra o progresso e, se tiver, a última aparição neste mundo //
+    if ((dados.intervalos ?? 0) < (dados.minimo_intervalos ?? minimo_padrao)) {
 
-        const mensagem = document.createElement("p");
-        mensagem.className = "mensagem";
-        mensagem.textContent = t(dados.aparicoes === 1 ? "historico_insuficiente" : "sem_historico");
-        card.append(mensagem);
+        card.append(criar_mensagem(t("poucos_dados")(dados.intervalos ?? 0, dados.minimo_intervalos ?? minimo_padrao)));
 
-        if (dados.aparicoes === 1) {
+        if (dados.ultima_aparicao) {
             card.append(criar_detalhes([[t("ultima_aparicao"), ultima()]]));
         }
 
         return card;
     }
 
+    // Tem previsão, mas a criatura nunca apareceu neste mundo: não dá para contar os dias //
+    if (!dados.ultima_aparicao) {
+
+        card.append(criar_mensagem(t("nao_apareceu")));
+        card.append(criar_detalhes([base]));
+
+        return card;
+    }
+
     card.append(criar_detalhes([
         [t("ultima_aparicao"), ultima()],
-        [t("proxima_prevista"), `${formatar_data(dados.proxima_prevista)} · ${t("intervalo")(dados.intervalo_medio)}`],
-        [t("aparicoes"), dados.aparicoes]
+        [t("proxima_prevista"), `${formatar_data(dados.proxima_prevista)} · ${t("intervalo")(Number(dados.intervalo_tipico))}`],
+        base
     ]));
 
     return card;
+}
+
+    // FUNÇÃO : MENSAGEM DO CARD //
+function criar_mensagem(texto) {
+
+    const mensagem = document.createElement("p");
+    mensagem.className = "mensagem";
+    mensagem.textContent = texto;
+
+    return mensagem;
 }
 
     // ORDEM DOS GRUPOS DE CHANCE //
