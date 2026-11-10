@@ -2,15 +2,61 @@
 
 [![Testes](https://github.com/FernandoGali/tibia-boss-detector/actions/workflows/testes.yml/badge.svg)](https://github.com/FernandoGali/tibia-boss-detector/actions/workflows/testes.yml)
 
-Projeto pessoal pra ajudar a encontrar criaturas raras e bosses no Tibia.
+Site que mostra a chance de cada boss e criatura rara do Tibia aparecer hoje, em cada mundo, a partir do histórico de mortes coletado todo dia.
 
-A ideia é simples: as kill statistics de cada mundo mostram quantas vezes cada criatura morreu no último dia. Se um boss aparece com morte num mundo, é porque ele nasceu lá. Guardando isso todo dia, dá pra montar um histórico de onde e com que frequência cada criatura aparece.
+**No ar:** https://bossdetector.duckdns.org
 
-Os dados vêm da [API TibiaData](https://tibiadata.com/).
+![O site: escolhe o mundo e as criaturas, clica em Consultar e vê a chance de cada uma](docs/demo.gif)
 
-O projeto coleta e guarda os dados todo dia, e tem um site onde a pessoa escolhe o mundo e as criaturas e vê a chance de cada uma aparecer (alta, média ou baixa), com a última aparição e a próxima prevista. O site tem versão em português e em inglês.
+<sub>Os números do GIF são de exemplo, para mostrar as três faixas de chance. A coleta real começou em 07/11/2026.</sub>
 
-O site está no ar em **https://bossdetector.duckdns.org**.
+## O problema e a solução
+
+**Problema:** no Tibia, bosses e criaturas raras nascem em dias aleatórios em cada um dos 90 mundos, e o jogo não avisa quando.
+**Dado disponível:** as kill statistics públicas de cada mundo mostram quantas vezes cada criatura morreu no dia anterior.
+**Solução:** coletar essas estatísticas de todos os mundos todo dia, guardar o histórico no PostgreSQL e mostrar num site, por mundo, a chance de cada criatura aparecer (alta, média ou baixa) e quando ela é esperada.
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    A[API TibiaData] -->|de hora em hora| B[Sentinelas + coletor<br>Python]
+    B --> C[(PostgreSQL)]
+    C --> D[API<br>FastAPI]
+    D --> E[Site<br>HTML, CSS e JS]
+```
+
+Tudo roda numa VM grátis do Google Cloud: o coletor por um timer do systemd, a API e o site no mesmo processo, e o Caddy na frente cuidando do HTTPS.
+
+## Em números
+
+Retrato de 09/11/2026:
+
+| | |
+|---|---|
+| Mundos acompanhados | 90 |
+| Criaturas acompanhadas | 59 |
+| Registros por dia | 5.310 (90 mundos × 59 criaturas) |
+| Dias de histórico | 2 (desde 07/11/2026) |
+| Registros no banco | 10.620 |
+| Aparições registradas | 931 |
+| Testes automatizados | 52, rodando no GitHub Actions com PostgreSQL |
+| Hospedagem | Plano grátis do Google Cloud (e2-micro, 1 GB de RAM) |
+
+## Decisões técnicas e aprendizados
+
+**Por que sentinelas.** As kill statistics atualizam uma vez por dia, mas o horário não é divulgado. Consultar os 90 mundos de hora em hora daria mais de 2 mil requisições por dia. Em vez disso, 7 mundos "sentinela" (os mais cheios de cada região) são consultados de hora em hora; quando a soma das kills de um deles muda, é porque atualizou, e só então os 90 mundos são coletados. Depois da atualização do dia, as sentinelas param até o dia seguinte. Acompanhando assim, deu para descobrir o horário real: sempre entre 03:00 e 04:00 de Berlim.
+
+**Por que o fuso de Berlim.** O Tibia roda no horário de Berlim, e a atualização do dia D traz as mortes do dia D-1. Usando o horário de Brasília, uma coleta feita logo depois da meia-noite de Berlim cairia no dia errado, e a diferença entre os dois fusos ainda muda com o horário de verão europeu (4 ou 5 horas). Por isso todas as datas do projeto são de Berlim, e a data salva é a do dia das mortes, não a do dia da coleta.
+
+**Por que juntar os mundos na previsão.** A regra de nascimento de uma criatura é a mesma em todos os mundos. Calculando o intervalo entre aparições só dentro de um mundo, uma criatura rara levaria meses para ter dados suficientes. Juntando os intervalos dos 90 mundos, o histórico cresce 90 vezes mais rápido. O intervalo típico é a mediana, e não a média, porque um boss que nasce e ninguém mata deixa um intervalo longo demais que puxaria a média para cima.
+
+**O que deu errado no caminho:**
+
+- **O zero que não era zero.** Durante quase duas semanas, 8 criaturas apareceram com 0 mortes em todos os mundos. Parecia que eram só raras. Comparando com os nomes que a API realmente usa, a causa era outra: criaturas comuns vêm no plural e em minúsculas ("dire penguins", "yetis") e alguns bosses com maiúsculas diferentes ("Arthom The Hunter"). O coletor procurava o nome exato e nunca achava. A correção foi comparar sem diferenciar maiúsculas e manter uma tabela com os nomes no plural. Como o histórico daqueles dias estava errado, a contagem foi zerada e recomeçou do zero.
+- **"Dados até hoje" que não eram de hoje.** A primeira versão do site mostrava a data da consulta como se fosse a data dos dados. Como a atualização traz o dia anterior, o site prometia um dia que ainda não existia no banco. A linha foi tirada, já que cada card já mostra suas próprias datas.
+- **Previsão com dado de menos.** A primeira previsão usava a média dos intervalos de um mundo só e aparecia a partir de 2 aparições. Com tão pouco dado, ela mudava muito de um dia para o outro. Daí veio a mudança para a mediana dos 90 mundos, com um mínimo de 4 intervalos antes de mostrar qualquer chance.
+- **Hospedagem grátis com 1 GB de memória.** A VM grátis tem só 1 GB de RAM para o PostgreSQL, a API e a coleta. O PostgreSQL foi ajustado para usar pouca memória, a máquina ganhou 2 GB de swap como folga, e a API reaproveita conexões com o banco em vez de abrir uma por consulta.
 
 ## Como funciona
 
