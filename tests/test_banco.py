@@ -34,9 +34,9 @@ def gravar_snapshots(conexao, mundo, criatura, dias_com_kill, dias_sem_kill=()):
 
     # AJUDANTE : SEMÁFORO DE UMA CRIATURA #
     # Consulta uma criatura só e devolve a linha dela #
-def semaforo_de(conexao, criatura, hoje, mundo="Kalibra"):
+def semaforo_de(conexao, criatura, mundo="Kalibra"):
 
-    linhas = banco.consultar_semaforo(conexao, mundo, [criatura], hoje)
+    linhas = banco.consultar_semaforo(conexao, mundo, [criatura])
 
     assert len(linhas) == 1
 
@@ -70,69 +70,76 @@ def coleta_falsa(mundo, regiao, dia, kills_24h_total=10):
 
 
     # TESTES : SEMÁFORO #
-    # O intervalo típico junta os intervalos de todos os mundos #
-    # O semáforo só aparece com pelo menos banco.minimo_intervalos (4) intervalos #
+    # Tudo é por criatura e por mundo: nada de outra criatura ou de outro mundo entra na conta #
+    # O semáforo só aparece com pelo menos banco.minimo_intervalos (4) intervalos naquele mundo #
+    # Os dias sem aparecer contam até o último dia coletado do mundo (o maior dia gravado) #
 
-    # AJUDANTE : INTERVALO DE 4 DIAS EM ANTICA #
-    # Antica nos dias 1, 5, 9, 13 e 17 = 4 intervalos de 4 dias (já atinge o mínimo) #
-def antica_a_cada_4_dias(conexao, criatura="Munster"):
+    # AJUDANTE : A CADA 4 DIAS #
+    # Kills nos dias 1, 5, 9, 13 e 17 = 4 intervalos de 4 dias (já atinge o mínimo) #
+    # dias_sem_kill estende a coleta até o dia que o teste quiser #
+def a_cada_4_dias(conexao, dias_sem_kill=(), mundo="Kalibra", criatura="Munster"):
 
-    gravar_snapshots(conexao, "Antica", criatura, [nov(1), nov(5), nov(9), nov(13), nov(17)])
+    gravar_snapshots(conexao, mundo, criatura, [nov(1), nov(5), nov(9), nov(13), nov(17)], dias_sem_kill)
 
-    # TESTE : SEMÁFORO ALTA JUNTANDO OS MUNDOS #
-    # Kalibra (1, 3, 5) e Antica (2, 4, 6) têm 2 intervalos de 2 dias cada = 4 intervalos, mediana 2 #
-    # Em Kalibra a última foi no dia 5: próxima no dia 7; no dia 10 já são 5 dias = alta #
-def test_semaforo_alta_juntando_os_mundos(conexao):
+    # TESTE : SEMÁFORO ALTA #
+    # Intervalo típico de 2 dias; a coleta vai até o dia 12 e a última morte foi no dia 9 #
+    # São 3 dias sem aparecer (mais que o intervalo) = alta; próxima prevista no dia 11 #
+def test_semaforo_alta(conexao):
 
-    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3), nov(5)], [nov(2), nov(4)])
-    gravar_snapshots(conexao, "Antica", "Munster", [nov(2), nov(4), nov(6)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3), nov(5), nov(7), nov(9)], [nov(10), nov(11), nov(12)])
 
-    linha = semaforo_de(conexao, "Munster", nov(10))
+    linha = semaforo_de(conexao, "Munster")
 
-    assert linha["aparicoes"] == 3
-    assert linha["ultima_aparicao"] == nov(5)
-    assert linha["ultimas_aparicoes"] == [nov(5), nov(3), nov(1)]
-    assert linha["aparicoes_total"] == 6
-    assert linha["mundos_com_aparicao"] == 2
+    assert linha["aparicoes"] == 5
+    assert linha["ultima_aparicao"] == nov(9)
+    assert linha["ultimas_aparicoes"] == [nov(9), nov(7), nov(5)]
     assert linha["intervalos"] == 4
     assert linha["minimo_intervalos"] == 4
     assert linha["intervalo_tipico"] == 2
-    assert linha["proxima_prevista"] == nov(7)
-    assert linha["dias_sem_aparecer"] == 5
+    assert linha["ultimo_dia_coletado"] == nov(12)
+    assert linha["dias_sem_aparecer"] == 3
+    assert linha["proxima_prevista"] == nov(11)
     assert linha["semaforo"] == "alta"
     assert linha["mensagem"] is None
 
     # TESTE : SEMÁFORO ALTA NO DIA EXATO #
-    # Intervalo típico de 4 dias; em Kalibra apareceu só no dia 20 (1 vez, mas o intervalo vem de Antica) #
-    # No dia 24 são exatamente 4 dias: já conta como alta #
+    # Intervalo de 4 dias e exatamente 4 dias sem aparecer (coleta até o dia 21): já conta como alta #
 def test_semaforo_alta_no_dia_previsto(conexao):
 
-    antica_a_cada_4_dias(conexao)
-    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(20)])
+    a_cada_4_dias(conexao, [nov(18), nov(19), nov(20), nov(21)])
 
-    linha = semaforo_de(conexao, "Munster", nov(24))
+    linha = semaforo_de(conexao, "Munster")
 
-    assert linha["aparicoes"] == 1
-    assert linha["proxima_prevista"] == nov(24)
+    assert linha["proxima_prevista"] == nov(21)
     assert linha["semaforo"] == "alta"
 
     # TESTE : SEMÁFORO MÉDIA #
-    # Intervalo típico de 4 dias e 3 dias sem aparecer em Kalibra (passou da metade) = média #
+    # Intervalo de 4 dias e 3 dias sem aparecer (passou da metade) = média #
 def test_semaforo_media(conexao):
 
-    antica_a_cada_4_dias(conexao)
-    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(20)])
+    a_cada_4_dias(conexao, [nov(18), nov(19), nov(20)])
 
-    assert semaforo_de(conexao, "Munster", nov(23))["semaforo"] == "média"
+    assert semaforo_de(conexao, "Munster")["semaforo"] == "média"
 
     # TESTE : SEMÁFORO BAIXA #
-    # Intervalo típico de 4 dias e só 1 dia sem aparecer em Kalibra = baixa #
+    # Intervalo de 4 dias e só 1 dia sem aparecer = baixa #
 def test_semaforo_baixa(conexao):
 
-    antica_a_cada_4_dias(conexao)
-    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(20)])
+    a_cada_4_dias(conexao, [nov(18)])
 
-    assert semaforo_de(conexao, "Munster", nov(21))["semaforo"] == "baixa"
+    assert semaforo_de(conexao, "Munster")["semaforo"] == "baixa"
+
+    # TESTE : APARECEU NO ÚLTIMO DIA COLETADO #
+    # A última morte é o dia mais recente que existe no banco: 0 dias sem aparecer, e não "dias desde hoje" #
+def test_semaforo_conta_ate_o_ultimo_dia_coletado(conexao):
+
+    a_cada_4_dias(conexao)
+
+    linha = semaforo_de(conexao, "Munster")
+
+    assert linha["ultimo_dia_coletado"] == nov(17)
+    assert linha["dias_sem_aparecer"] == 0
+    assert linha["semaforo"] == "baixa"
 
     # TESTE : MEDIANA, NÃO MÉDIA #
     # Intervalos de 2, 2, 2 e 20 dias (um nascimento que ninguém matou): mediana 2, média seria 6,5 #
@@ -140,7 +147,7 @@ def test_semaforo_usa_a_mediana(conexao):
 
     gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3), nov(5), nov(7), nov(27)])
 
-    linha = semaforo_de(conexao, "Munster", nov(28))
+    linha = semaforo_de(conexao, "Munster")
 
     assert linha["intervalos"] == 4
     assert linha["intervalo_tipico"] == 2
@@ -149,89 +156,77 @@ def test_semaforo_usa_a_mediana(conexao):
     # Só 3 intervalos (mínimo é 4): sem intervalo, sem previsão, sem semáforo, com mensagem #
 def test_semaforo_abaixo_do_minimo(conexao):
 
-    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3), nov(5), nov(7)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3), nov(5), nov(7)], [nov(8)])
 
-    linha = semaforo_de(conexao, "Munster", nov(10))
+    linha = semaforo_de(conexao, "Munster")
 
     assert linha["aparicoes"] == 4
     assert linha["intervalos"] == 3
+    assert linha["dias_sem_aparecer"] == 1
     assert linha["intervalo_tipico"] is None
     assert linha["proxima_prevista"] is None
     assert linha["semaforo"] is None
     assert linha["mensagem"] == "Histórico ainda é insuficiente para previsão"
 
-    # TESTE : INTERVALO SÓ DENTRO DO MESMO MUNDO #
-    # Kalibra no dia 1 e Antica no dia 2 não formam um intervalo de 1 dia: são mundos diferentes #
-def test_semaforo_nao_mistura_mundos_no_intervalo(conexao):
+    # TESTE : OUTRO MUNDO NÃO ENTRA NA CONTA #
+    # Antica tem intervalos de sobra, mas Kalibra só tem 1: Kalibra fica sem previsão #
+def test_semaforo_nao_usa_outro_mundo(conexao):
 
-    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1)])
-    gravar_snapshots(conexao, "Antica", "Munster", [nov(2)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3)])
+    a_cada_4_dias(conexao, mundo="Antica")
 
-    linha = semaforo_de(conexao, "Munster", nov(10))
+    kalibra = semaforo_de(conexao, "Munster", mundo="Kalibra")
+    antica = semaforo_de(conexao, "Munster", mundo="Antica")
 
-    assert linha["aparicoes_total"] == 2
-    assert linha["intervalos"] == 0
+    assert kalibra["intervalos"] == 1
+    assert kalibra["semaforo"] is None
+    assert antica["intervalos"] == 4
+    assert antica["intervalo_tipico"] == 4
 
-    # TESTE : NUNCA APARECEU NESTE MUNDO, MAS TEM PREVISÃO #
-    # Antica já tem intervalos suficientes, mas Kalibra nunca teve o Munster: #
-    # não dá para contar dias sem aparecer, então fica sem semáforo e com mensagem própria #
-def test_semaforo_nunca_apareceu_neste_mundo(conexao):
+    # TESTE : OUTRA CRIATURA NÃO ENTRA NA CONTA #
+    # O Yakchal tem intervalos de sobra em Kalibra, mas o Munster só tem 1: Munster fica sem previsão #
+def test_semaforo_nao_usa_outra_criatura(conexao):
 
-    antica_a_cada_4_dias(conexao)
-    gravar_snapshots(conexao, "Kalibra", "Munster", [], [nov(1), nov(2)])
+    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3)])
+    a_cada_4_dias(conexao, criatura="Yakchal")
 
-    linha = semaforo_de(conexao, "Munster", nov(20))
+    munster = semaforo_de(conexao, "Munster")
+    yakchal = semaforo_de(conexao, "Yakchal")
 
-    assert linha["aparicoes"] == 0
-    assert linha["aparicoes_total"] == 5
-    assert linha["intervalo_tipico"] == 4
-    assert linha["proxima_prevista"] is None
-    assert linha["semaforo"] is None
-    assert linha["mensagem"] == "Ainda não apareceu neste mundo"
+    assert munster["intervalos"] == 1
+    assert munster["semaforo"] is None
+    assert yakchal["intervalos"] == 4
 
-    # TESTE : SÓ AS ÚLTIMAS 3 APARIÇÕES #
-    # Apareceu 4 vezes, mas a lista mostra só as 3 mais recentes #
-def test_semaforo_mostra_so_as_3_ultimas(conexao):
-
-    gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(2), nov(3), nov(4)])
-
-    linha = semaforo_de(conexao, "Munster", nov(10))
-
-    assert linha["aparicoes"] == 4
-    assert linha["ultimas_aparicoes"] == [nov(4), nov(3), nov(2)]
-
-    # TESTE : NUNCA APARECEU EM LUGAR NENHUM #
+    # TESTE : NUNCA APARECEU #
     # Só dias com 0 kills: lista vazia, nada de intervalo, sem semáforo, com mensagem #
 def test_semaforo_nunca_apareceu(conexao):
 
     gravar_snapshots(conexao, "Kalibra", "Yeti", [], [nov(1), nov(2), nov(3)])
 
-    linha = semaforo_de(conexao, "Yeti", nov(10))
+    linha = semaforo_de(conexao, "Yeti")
 
     assert linha["aparicoes"] == 0
-    assert linha["aparicoes_total"] == 0
-    assert linha["mundos_com_aparicao"] == 0
     assert linha["intervalos"] == 0
     assert linha["ultima_aparicao"] is None
+    assert linha["dias_sem_aparecer"] is None
     assert linha["ultimas_aparicoes"] == []
     assert linha["semaforo"] is None
     assert linha["mensagem"] == "Histórico ainda é insuficiente para previsão"
 
     # TESTE : SÓ O MUNDO E AS CRIATURAS PEDIDAS #
-    # As datas do card são só de Kalibra; o total soma Antica; o Yakchal não entra em nada #
+    # O Munster de Antica e o Yakchal não podem entrar numa consulta do Munster em Kalibra #
 def test_semaforo_filtra_mundo_e_criaturas(conexao):
 
     gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1), nov(3)])
     gravar_snapshots(conexao, "Antica", "Munster", [nov(5), nov(7)])
     gravar_snapshots(conexao, "Kalibra", "Yakchal", [nov(2), nov(4)])
 
-    linhas = banco.consultar_semaforo(conexao, "Kalibra", ["Munster"], nov(10))
+    linhas = banco.consultar_semaforo(conexao, "Kalibra", ["Munster"])
 
     assert len(linhas) == 1
     assert linhas[0]["criatura"] == "Munster"
     assert linhas[0]["ultimas_aparicoes"] == [nov(3), nov(1)]
-    assert linhas[0]["aparicoes_total"] == 4
-    assert linhas[0]["intervalos"] == 2
+    assert linhas[0]["intervalos"] == 1
 
     # TESTE : ORDEM DO RESULTADO #
     # Primeiro quem apareceu mais vezes; empate fica em ordem alfabética #
@@ -242,7 +237,7 @@ def test_semaforo_ordem(conexao):
     gravar_snapshots(conexao, "Kalibra", "Munster", [nov(1)])
     gravar_snapshots(conexao, "Kalibra", "Furyosa", [nov(2)])
 
-    linhas = banco.consultar_semaforo(conexao, "Kalibra", ["Yeti", "Yakchal", "Munster", "Furyosa"], nov(10))
+    linhas = banco.consultar_semaforo(conexao, "Kalibra", ["Yeti", "Yakchal", "Munster", "Furyosa"])
 
     assert [l["criatura"] for l in linhas] == ["Yakchal", "Furyosa", "Munster", "Yeti"]
 

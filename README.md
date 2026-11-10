@@ -49,13 +49,15 @@ Retrato de 09/11/2026:
 
 **Por que o fuso de Berlim.** O Tibia roda no horário de Berlim, e a atualização do dia D traz as mortes do dia D-1. Usando o horário de Brasília, uma coleta feita logo depois da meia-noite de Berlim cairia no dia errado, e a diferença entre os dois fusos ainda muda com o horário de verão europeu (4 ou 5 horas). Por isso todas as datas do projeto são de Berlim, e a data salva é a do dia das mortes, não a do dia da coleta.
 
-**Por que juntar os mundos na previsão.** A regra de nascimento de uma criatura é a mesma em todos os mundos. Calculando o intervalo entre aparições só dentro de um mundo, uma criatura rara levaria meses para ter dados suficientes. Juntando os intervalos dos 90 mundos, o histórico cresce 90 vezes mais rápido. O intervalo típico é a mediana, e não a média, porque um boss que nasce e ninguém mata deixa um intervalo longo demais que puxaria a média para cima.
+**Por que a conta é por criatura e por mundo.** Cada criatura, em cada mundo, tem o próprio histórico: o intervalo típico do Yakchal em Antica usa só as mortes do Yakchal em Antica. Isso demora mais para ter dados suficientes, mas não mistura nada. Para conferir se as contas fazem sentido, uma consulta separada (`conferencia_mundos.sql`) compara o intervalo da mesma criatura em vários mundos, sem entrar na conta do site. O intervalo típico é a mediana, e não a média, porque um boss que nasce e ninguém mata deixa um intervalo longo demais que puxaria a média para cima.
 
 **O que deu errado no caminho:**
 
 - **O zero que não era zero.** Durante quase duas semanas, 8 criaturas apareceram com 0 mortes em todos os mundos. Parecia que eram só raras. Comparando com os nomes que a API realmente usa, a causa era outra: criaturas comuns vêm no plural e em minúsculas ("dire penguins", "yetis") e alguns bosses com maiúsculas diferentes ("Arthom The Hunter"). O coletor procurava o nome exato e nunca achava. A correção foi comparar sem diferenciar maiúsculas e manter uma tabela com os nomes no plural. Como o histórico daqueles dias estava errado, a contagem foi zerada e recomeçou do zero.
 - **"Dados até hoje" que não eram de hoje.** A primeira versão do site mostrava a data da consulta como se fosse a data dos dados. Como a atualização traz o dia anterior, o site prometia um dia que ainda não existia no banco. A linha foi tirada, já que cada card já mostra suas próprias datas.
-- **Previsão com dado de menos.** A primeira previsão usava a média dos intervalos de um mundo só e aparecia a partir de 2 aparições. Com tão pouco dado, ela mudava muito de um dia para o outro. Daí veio a mudança para a mediana dos 90 mundos, com um mínimo de 4 intervalos antes de mostrar qualquer chance.
+- **Previsão com dado de menos.** A primeira previsão usava a média dos intervalos de um mundo só e aparecia a partir de 2 aparições. Com tão pouco dado, ela mudava muito de um dia para o outro. Daí veio a mudança para a mediana, com um mínimo de 4 intervalos antes de mostrar qualquer chance.
+- **Juntar os mundos cedo demais.** Para ter previsão mais rápido, os intervalos dos 90 mundos chegaram a ser juntados. Com só 2 dias de coleta, o único intervalo possível era de 1 dia, e juntando os mundos esses intervalos passaram rápido do mínimo: o site concluiu que o Yakchal nasce todo dia. No começo da coleta, juntar os mundos só acelerava o dado enviesado. A conta voltou a ser por mundo, e a comparação entre mundos virou uma conferência.
+- **Contar os dias a partir de hoje.** Os dias sem aparecer eram contados até a data de hoje, mas o banco só tem até o último dia coletado, que fica 1 ou 2 dias para trás. Uma criatura morta no último dia com dados aparecia como "há 2 dias" e virava chance alta. Agora a conta vai até o último dia coletado daquele mundo.
 - **Hospedagem grátis com 1 GB de memória.** A VM grátis tem só 1 GB de RAM para o PostgreSQL, a API e a coleta. O PostgreSQL foi ajustado para usar pouca memória, a máquina ganhou 2 GB de swap como folga, e a API reaproveita conexões com o banco em vez de abrir uma por consulta.
 
 ## Como funciona
@@ -81,25 +83,27 @@ Se algum mundo falhar ou ainda estiver com os números do dia anterior, ele é c
 - `tempo.py` - fusos e horários do Tibia
 - `registro.py` - log
 - `banco.py` - tudo que mexe no PostgreSQL
+- `consulta_semaforo.sql` - a conta do semáforo para um mundo, para rodar direto no banco
+- `conferencia_mundos.sql` - compara o intervalo da mesma criatura em vários mundos
 - `api.py` - API que o site usa (e que também entrega o site)
 - `site/` - o site: página de seleção (`index.html`), página de resultado (`resultado.html`), estilo, script e imagens
 
 ### Previsão
 
-Para cada criatura, o projeto mede os **intervalos**: quantos dias se passaram entre duas aparições seguidas no mesmo mundo. Como a regra de nascimento de uma criatura é a mesma em todos os mundos, os intervalos de todos os mundos são juntados, e o **intervalo típico** é a mediana deles.
+Para cada criatura, em cada mundo, o projeto mede os **intervalos**: quantos dias se passaram entre duas aparições seguidas dela naquele mundo. O **intervalo típico** é a mediana desses intervalos. Nada de outra criatura ou de outro mundo entra na conta.
 
-Em cada mundo, a chance compara esse intervalo com os dias desde a última aparição naquele mundo: passou do intervalo, a chance é **alta**; passou da metade, **média**; antes disso, **baixa**. A previsão só aparece a partir de 4 intervalos. Abaixo disso, o site mostra quantos faltam.
+Em cada mundo, a chance compara esse intervalo com os dias desde a última aparição naquele mundo, contados até o último dia coletado (e não até hoje, que ainda não chegou nas kill statistics): passou do intervalo, a chance é **alta**; passou da metade, **média**; antes disso, **baixa**. A previsão só aparece a partir de 4 intervalos. Abaixo disso, o site mostra quantos faltam.
 
 ## Limitações
 
 A previsão é uma estimativa a partir de dados públicos, não uma regra do jogo. Vale saber de onde ela pode errar:
 
 - **O que se mede é a morte, não o nascimento.** As kill statistics só registram criaturas mortas. Um boss que nasce e ninguém mata não aparece, e o intervalo registrado fica maior do que o real. Um boss morto dias depois de nascer conta no dia da morte. A mediana diminui o efeito desses casos, mas não elimina.
-- **A regra de nascimento não é oficial.** A CipSoft não divulga como os bosses nascem. Juntar os mundos parte da ideia de que a regra é a mesma em todos, o que é a suposição mais aceita pela comunidade, mas não é garantida.
+- **A regra de nascimento não é oficial.** A CipSoft não divulga como os bosses nascem. A previsão só supõe que uma criatura tende a repetir o próprio intervalo naquele mundo. A conferência entre mundos (`conferencia_mundos.sql`) ajuda a ver se essa suposição se sustenta.
 - **Só existe o dia, não a hora.** As kill statistics são diárias e chegam com um dia de atraso (a atualização do dia D traz o dia D-1). Não dá para saber em que horário a criatura apareceu, e o dia de hoje só entra amanhã.
 - **Dia perdido não volta.** A API só mostra o último dia. Se a coleta falhar o dia inteiro (API fora do ar, servidor desligado), aquele dia fica sem dados, e um intervalo pode parecer maior do que foi.
 - **Eventos e quests distorcem.** Se uma criatura aparece por evento, quest ou invocação, as mortes entram na mesma conta que os nascimentos normais.
-- **Pouco histórico no começo.** Com poucos dias coletados, a maioria das criaturas fica sem previsão até juntar 4 intervalos. Criaturas muito raras podem levar meses.
+- **Pouco histórico no começo.** Cada criatura precisa de 4 intervalos no próprio mundo, ou seja, 5 aparições. Um boss que nasce a cada 10 dias leva uns 50 dias para ter previsão, e criaturas muito raras podem levar meses.
 - **Depende do TibiaData.** Os dados vêm de uma API mantida pela comunidade, que pode mudar ou sair do ar.
 
 ## Instalação

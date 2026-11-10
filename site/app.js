@@ -16,12 +16,12 @@ const textos = {
         baixa: "Chance baixa",
         sem_previsao: "Sem previsão",
         poucos_dados: (intervalos, minimo) => `Ainda poucos dados: ${intervalos} de ${minimo} intervalos`,
-        nao_apareceu: "Ainda não apareceu neste mundo",
+        dados_ate: (data) => `dados até ${data}`,
         ultima_aparicao: "Última aparição",
         proxima_prevista: "Próxima prevista",
         base_previsao: "Base da previsão",
-        base: (aparicoes, mundos) => `${aparicoes} ${aparicoes === 1 ? "aparição" : "aparições"} em ${mundos} ${mundos === 1 ? "mundo" : "mundos"}`,
-        dias_atras: (dias) => dias === 0 ? "hoje" : dias === 1 ? "há 1 dia" : `há ${dias} dias`,
+        base: (aparicoes) => `${aparicoes} ${aparicoes === 1 ? "aparição" : "aparições"} neste mundo`,
+        dias_atras: (dias) => dias === 0 ? "no último dia com dados" : dias === 1 ? "1 dia sem aparecer" : `${dias} dias sem aparecer`,
         intervalo: (dias) => `intervalo típico de ${dias.toLocaleString("pt-BR")} ${dias === 1 ? "dia" : "dias"}`,
         regioes: { "Europe": "Europa", "North America": "América do Norte", "South America": "América do Sul", "Oceania": "Oceania" }
     },
@@ -40,12 +40,12 @@ const textos = {
         baixa: "Low chance",
         sem_previsao: "No prediction",
         poucos_dados: (intervalos, minimo) => `Not enough data yet: ${intervalos} of ${minimo} intervals`,
-        nao_apareceu: "Not seen on this world yet",
+        dados_ate: (data) => `data up to ${data}`,
         ultima_aparicao: "Last seen",
         proxima_prevista: "Next expected",
         base_previsao: "Prediction based on",
-        base: (aparicoes, mundos) => `${aparicoes} ${aparicoes === 1 ? "appearance" : "appearances"} on ${mundos} ${mundos === 1 ? "world" : "worlds"}`,
-        dias_atras: (dias) => dias === 0 ? "today" : dias === 1 ? "1 day ago" : `${dias} days ago`,
+        base: (aparicoes) => `${aparicoes} ${aparicoes === 1 ? "appearance" : "appearances"} on this world`,
+        dias_atras: (dias) => dias === 0 ? "on the latest day with data" : dias === 1 ? "1 day without appearing" : `${dias} days without appearing`,
         intervalo: (dias) => `typical interval of ${dias.toLocaleString("en-US")} ${dias === 1 ? "day" : "days"}`,
         regioes: { "Europe": "Europe", "North America": "North America", "South America": "South America", "Oceania": "Oceania" }
     }
@@ -315,7 +315,7 @@ function criar_card(dados) {
     card.append(topo);
 
     const ultima = () => `${formatar_data(dados.ultima_aparicao)} · ${t("dias_atras")(dados.dias_sem_aparecer)}`;
-    const base = [t("base_previsao"), t("base")(dados.aparicoes_total ?? 0, dados.mundos_com_aparicao ?? 0)];
+    const base = [t("base_previsao"), t("base")(dados.aparicoes ?? 0)];
 
     // Abaixo do mínimo de intervalos: mostra o progresso e, se tiver, a última aparição neste mundo //
     if ((dados.intervalos ?? 0) < (dados.minimo_intervalos ?? minimo_padrao)) {
@@ -325,15 +325,6 @@ function criar_card(dados) {
         if (dados.ultima_aparicao) {
             card.append(criar_detalhes([[t("ultima_aparicao"), ultima()]]));
         }
-
-        return card;
-    }
-
-    // Tem previsão, mas a criatura nunca apareceu neste mundo: não dá para contar os dias //
-    if (!dados.ultima_aparicao) {
-
-        card.append(criar_mensagem(t("nao_apareceu")));
-        card.append(criar_detalhes([base]));
 
         return card;
     }
@@ -376,7 +367,9 @@ function mostrar_resultado({ resposta, pedidas }) {
     aviso_atual = null;
     const aviso = document.getElementById("aviso");
     aviso.classList.remove("erro");
-    aviso.textContent = resposta.mundo;
+    aviso.textContent = resposta.dados_ate
+        ? `${resposta.mundo} · ${t("dados_ate")(formatar_data(resposta.dados_ate))}`
+        : resposta.mundo;
 
     document.getElementById("cards").replaceChildren(...todas.map(criar_card));
 }

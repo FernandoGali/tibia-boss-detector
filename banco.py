@@ -54,11 +54,6 @@ CREATE TABLE IF NOT EXISTS leituras_sentinela (
     kills_7d_total  BIGINT NOT NULL,
     mudou           BOOLEAN
 );
-
--- Só os dias com morte, por criatura e mundo: é o que o semáforo lê de todos os mundos --
-CREATE INDEX IF NOT EXISTS snapshots_aparicoes
-    ON snapshots (criatura, mundo, data_atividade)
-    WHERE kills_24h > 0;
 """
 
     # FUNÇÕES #
@@ -294,38 +289,33 @@ def listar_mundos(conexao):
 minimo_intervalos = 4
 
     # FUNÇÃO : CONSULTAR SEMÁFORO #
-    # A regra de nascimento de uma criatura é a mesma em todos os mundos, então o intervalo #
-    # típico é calculado juntando os intervalos de todos os mundos (muito mais dados) #
-    # Intervalo = dias entre duas aparições seguidas da criatura no MESMO mundo #
+    # Tudo é calculado por criatura e por mundo, sem misturar criaturas nem mundos #
+    # Intervalo = dias entre duas aparições seguidas da criatura naquele mundo #
     # Intervalo típico = mediana desses intervalos (resiste a nascimentos que ninguém matou) #
-    # O semáforo de cada mundo compara esse intervalo com os dias sem aparecer NAQUELE mundo #
-def consultar_semaforo(conexao, mundo, criaturas, hoje):
+    # Os dias sem aparecer contam até o último dia coletado do mundo, e não até hoje: #
+    # o dia de hoje e o de ontem ainda não chegaram nas kill statistics (atualização do dia D traz o D-1) #
+def consultar_semaforo(conexao, mundo, criaturas):
 
     comando = """
-        WITH aparicoes_todas AS (
-            SELECT mundo, criatura, data_atividade
+        WITH ultimo_dia AS (
+            SELECT MAX(data_atividade) AS dia
             FROM snapshots
-            WHERE criatura = ANY(%(criaturas)s)
-              AND kills_24h > 0
+            WHERE mundo = %(mundo)s
         ),
         intervalos AS (
             SELECT criatura,
                    data_atividade - LAG(data_atividade)
-                       OVER (PARTITION BY mundo, criatura ORDER BY data_atividade) AS intervalo
-            FROM aparicoes_todas
+                       OVER (PARTITION BY criatura ORDER BY data_atividade) AS intervalo
+            FROM snapshots
+            WHERE mundo = %(mundo)s
+              AND criatura = ANY(%(criaturas)s)
+              AND kills_24h > 0
         ),
-        geral AS (
+        tipico AS (
             SELECT criatura,
                    COUNT(intervalo) AS intervalos,
                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY intervalo) AS intervalo_tipico
             FROM intervalos
-            GROUP BY criatura
-        ),
-        totais AS (
-            SELECT criatura,
-                   COUNT(*) AS aparicoes_total,
-                   COUNT(DISTINCT mundo) AS mundos_com_aparicao
-            FROM aparicoes_todas
             GROUP BY criatura
         ),
         neste_mundo AS (
@@ -344,41 +334,39 @@ def consultar_semaforo(conexao, mundo, criaturas, hoje):
                    m.aparicoes,
                    m.ultima_aparicao,
                    COALESCE(m.ultimas_aparicoes, ARRAY[]::date[]) AS ultimas_aparicoes,
-                   COALESCE(t.aparicoes_total, 0) AS aparicoes_total,
-                   COALESCE(t.mundos_com_aparicao, 0) AS mundos_com_aparicao,
-                   COALESCE(g.intervalos, 0) AS intervalos,
-                   g.intervalo_tipico,
-                   COALESCE(g.intervalos, 0) >= %(minimo)s AS tem_previsao
+                   COALESCE(t.intervalos, 0) AS intervalos,
+                   t.intervalo_tipico,
+                   u.dia AS ultimo_dia_coletado,
+                   u.dia - m.ultima_aparicao AS dias_sem_aparecer,
+                   COALESCE(t.intervalos, 0) >= %(minimo)s AS tem_previsao
             FROM neste_mundo m
-            LEFT JOIN geral g USING (criatura)
-            LEFT JOIN totais t USING (criatura)
+            LEFT JOIN tipico t USING (criatura)
+            CROSS JOIN ultimo_dia u
         )
         SELECT criatura,
                aparicoes,
                ultima_aparicao,
                ultimas_aparicoes,
-               aparicoes_total,
-               mundos_com_aparicao,
                intervalos,
                %(minimo)s AS minimo_intervalos,
-               %(hoje)s - ultima_aparicao AS dias_sem_aparecer,
+               ultimo_dia_coletado,
+               dias_sem_aparecer,
                CASE WHEN tem_previsao THEN ROUND(intervalo_tipico::numeric, 1) END AS intervalo_tipico,
                CASE WHEN tem_previsao THEN ultima_aparicao + ROUND(intervalo_tipico)::int END AS proxima_prevista,
                CASE
-                   WHEN NOT tem_previsao OR ultima_aparicao IS NULL THEN NULL
-                   WHEN %(hoje)s - ultima_aparicao >= intervalo_tipico THEN 'alta'
-                   WHEN %(hoje)s - ultima_aparicao >= intervalo_tipico / 2 THEN 'média'
+                   WHEN NOT tem_previsao THEN NULL
+                   WHEN dias_sem_aparecer >= intervalo_tipico THEN 'alta'
+                   WHEN dias_sem_aparecer >= intervalo_tipico / 2 THEN 'média'
                    ELSE 'baixa'
                END AS semaforo,
                CASE
                    WHEN NOT tem_previsao THEN 'Histórico ainda é insuficiente para previsão'
-                   WHEN ultima_aparicao IS NULL THEN 'Ainda não apareceu neste mundo'
                END AS mensagem
         FROM previsao
         ORDER BY aparicoes DESC, criatura
     """
 
-    parametros = {"mundo": mundo, "criaturas": criaturas, "hoje": hoje, "minimo": minimo_intervalos}
+    parametros = {"mundo": mundo, "criaturas": criaturas, "minimo": minimo_intervalos}
 
     return conexao.execute(comando, parametros).fetchall()
 

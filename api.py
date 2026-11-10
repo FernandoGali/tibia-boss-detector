@@ -7,7 +7,6 @@ from fastapi.staticfiles import StaticFiles
 
 import banco
 from criaturas import criaturas_raras
-from tempo import agora_tibia
 
     # CRIATURAS #
     # Nunca mudam: ficam prontas uma vez só, quando a API liga #
@@ -97,15 +96,15 @@ def consulta(mundo: str, criaturas: list[str] = Query(default=[])):
     if not criaturas:
         criaturas = criaturas_em_ordem
 
-    # Data de hoje no horário de Berlim, e não a do computador #
-    hoje = agora_tibia().date()
-
     with conexao_banco() as conexao:
-        resultado = banco.consultar_semaforo(conexao, mundo, criaturas, hoje)
+        resultado = banco.consultar_semaforo(conexao, mundo, criaturas)
+
+    # Último dia com dados daquele mundo (a atualização do dia D traz o D-1, então não é hoje) #
+    dados_ate = resultado[0]["ultimo_dia_coletado"] if resultado else None
 
     return {
         "mundo": mundo,
-        "data_consulta": hoje,
+        "dados_ate": dados_ate,
         "criaturas": resultado
     }
 

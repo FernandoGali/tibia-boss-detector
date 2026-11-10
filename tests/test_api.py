@@ -61,7 +61,7 @@ def test_consulta_sem_criaturas_busca_todas(monkeypatch):
 
     pedidos = []
 
-    def consultar_falso(conexao, mundo, criaturas, hoje):
+    def consultar_falso(conexao, mundo, criaturas):
         pedidos.append(criaturas)
         return []
 
