@@ -16,7 +16,6 @@ const textos = {
         baixa: "Chance baixa",
         sem_previsao: "Sem previsão",
         poucos_dados: (intervalos, minimo) => `Ainda poucos dados: ${intervalos} de ${minimo} intervalos`,
-        dados_ate: (data) => `dados até ${data}`,
         ultima_aparicao: "Última aparição",
         proxima_prevista: "Próxima prevista",
         base_previsao: "Base da previsão",
@@ -40,7 +39,6 @@ const textos = {
         baixa: "Low chance",
         sem_previsao: "No prediction",
         poucos_dados: (intervalos, minimo) => `Not enough data yet: ${intervalos} of ${minimo} intervals`,
-        dados_ate: (data) => `data up to ${data}`,
         ultima_aparicao: "Last seen",
         proxima_prevista: "Next expected",
         base_previsao: "Prediction based on",
@@ -367,9 +365,7 @@ function mostrar_resultado({ resposta, pedidas }) {
     aviso_atual = null;
     const aviso = document.getElementById("aviso");
     aviso.classList.remove("erro");
-    aviso.textContent = resposta.dados_ate
-        ? `${resposta.mundo} · ${t("dados_ate")(formatar_data(resposta.dados_ate))}`
-        : resposta.mundo;
+    aviso.textContent = resposta.mundo;
 
     document.getElementById("cards").replaceChildren(...todas.map(criar_card));
 }
