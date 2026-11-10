@@ -62,12 +62,12 @@ Retrato de 09/11/2026:
 
 Um script roda de hora em hora e faz duas coisas:
 
-1. Consulta alguns mundos "sentinela" pra saber se as kill statistics já foram atualizadas
+1. Consulta alguns mundos "sentinela" para saber se as kill statistics já foram atualizadas
 2. Se atualizaram, coleta as criaturas raras de todos os mundos e salva no banco
 
 As kill statistics atualizam uma vez por dia, de madrugada no horário de Berlim (acompanhei vários dias e foi sempre entre 03:00 e 04:00, todas as regiões juntas). A atualização do dia D traz as mortes do dia D-1, então é essa a data que fica salva. Todas as datas do projeto usam o horário de Berlim, que é o horário do Tibia.
 
-Sentinelas são os mundos mais cheios de cada região: 2 da Europa, 2 da América do Norte, 2 da América do Sul e 1 da Oceania (que só tem 3 mundos). Se a soma das kills de uma sentinela mudou de uma hora pra outra, é porque atualizou.
+Sentinelas são os mundos mais cheios de cada região: 2 da Europa, 2 da América do Norte, 2 da América do Sul e 1 da Oceania (que só tem 3 mundos). Se a soma das kills de uma sentinela mudou de uma hora para outra, é porque atualizou.
 
 Se algum mundo falhar ou ainda estiver com os números do dia anterior, ele é coletado de novo na hora seguinte.
 
@@ -126,11 +126,13 @@ CREATE DATABASE boss_detector OWNER boss_detector;
 
 Usa uma senha só com letras e números, porque ela vai dentro de uma URL e símbolos como `@` e `:` quebram a conexão.
 
-Depois cria um arquivo `.env` na pasta do projeto:
+Depois copia o modelo `.env.example` para `.env` e troca `sua_senha` pela senha que você criou:
 
+```bash
+cp .env.example .env
 ```
-DATABASE_URL=postgresql://boss_detector:sua_senha@localhost:5432/boss_detector
-```
+
+O `.env` fica fora do git. O `.env.example` mostra quais variáveis o projeto precisa, sem nenhuma senha.
 
 E cria as tabelas:
 
@@ -191,11 +193,11 @@ systemctl --user daemon-reload
 systemctl --user enable --now boss-detector.timer
 ```
 
-O `Persistent=true` faz ele rodar assim que o computador ligar se perdeu algum horário. Pra conferir: `systemctl --user list-timers`.
+O `Persistent=true` faz ele rodar assim que o computador ligar se perdeu algum horário. Para conferir: `systemctl --user list-timers`.
 
 ### De hora em hora no Windows
 
-Pra rodar de hora em hora no Windows, eu uso o Agendador de Tarefas com o `pythonw.exe` (que roda sem abrir janela). No PowerShell:
+Para rodar de hora em hora no Windows, eu uso o Agendador de Tarefas com o `pythonw.exe` (que roda sem abrir janela). No PowerShell:
 
 ```powershell
 $projeto = "C:\caminho\do\projeto"

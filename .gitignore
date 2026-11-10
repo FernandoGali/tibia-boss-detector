@@ -24,6 +24,7 @@ desktop.ini
 # Arquivos de ambiente e credenciais #
 .env
 .env.*
+!.env.example
 
 # Histórico gerado pelo coletor #
 historico.json
