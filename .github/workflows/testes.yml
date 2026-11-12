@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   testes:
-    runs-on: ubuntu-latest
+    # Fixed version: "latest" moved to Ubuntu 26.04 in Nov/2026 #
+    runs-on: ubuntu-24.04
 
     # BANCO DE TESTES #
     # Um PostgreSQL temporário, que só existe enquanto os testes rodam #
